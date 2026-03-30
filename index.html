@@ -958,7 +958,7 @@ input:focus, select:focus, textarea:focus {
       <section class="card span-12">
         <h2>Water Quality Testing Report</h2>
         <div class="actions">
-          <button class="button icon-button" type="button" id="saveReportBtn"><span class="button-icon" aria-hidden="true">💾</span><span>Generate &amp; Save</span></button>
+          <button class="button icon-button" type="button" id="saveReportBtn"><span class="button-icon" aria-hidden="true">📊</span><span>Generate &amp; Save Report</span></button>
         </div>
         <div class="field-grid" style="margin-top: 12px;">
           <div class="field">
@@ -1001,6 +1001,7 @@ input:focus, select:focus, textarea:focus {
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script>
     const STORAGE_KEY = 'mbsfm_pool_dosing_calculator_v5';
 
@@ -1535,8 +1536,17 @@ input:focus, select:focus, textarea:focus {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Water Quality Testing Report</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; margin: 20px; color: #1f2937; background: #ffffff; }
-    .report-sheet { border: 1px solid #cfd8e3; border-radius: 14px; overflow: hidden; background: #fff; }
+    @page { size: A4 landscape; margin: 12mm; }
+    html, body { margin: 0; padding: 0; background: #ffffff; color: #1f2937; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      width: 1320px;
+      min-width: 1320px;
+      margin: 0 auto;
+      padding: 18px;
+      box-sizing: border-box;
+    }
+    .report-sheet { border: 1px solid #cfd8e3; border-radius: 16px; overflow: hidden; background: #fff; width: 100%; }
     .report-title { padding: 18px 18px 8px; font-size: 30px; font-weight: 800; color: #0b3f6c; }
     .report-top { display: grid; grid-template-columns: 1fr 1.2fr; gap: 14px; padding: 0 18px 18px; }
     .report-company, .report-meta { border: 1px solid #cfd8e3; border-radius: 12px; padding: 14px; background: #fbfdff; font-size: 14px; line-height: 1.5; }
@@ -1544,9 +1554,9 @@ input:focus, select:focus, textarea:focus {
     .report-meta-item { display: grid; grid-template-columns: 110px 1fr; gap: 10px; }
     .report-meta-label { font-weight: 800; color: #0b3f6c; }
     .report-band { background: #0f4573; color: #fff; font-weight: 800; font-size: 16px; text-align: center; padding: 10px 14px; }
-    table { width: 100%; border-collapse: collapse; }
-    th { background: #2d86d5; color: #fff; font-size: 12px; padding: 10px 8px; text-transform: uppercase; }
-    td { font-size: 14px; padding: 10px 8px; border-bottom: 1px solid #dbe6f2; vertical-align: top; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    th { background: #2d86d5; color: #fff; font-size: 12px; padding: 10px 8px; text-transform: uppercase; word-wrap: break-word; }
+    td { font-size: 14px; padding: 10px 8px; border-bottom: 1px solid #dbe6f2; vertical-align: top; word-wrap: break-word; }
     .report-notes { padding: 14px 18px 18px; white-space: pre-wrap; }
     .report-footer { padding: 12px 18px 18px; font-size: 13px; color: #0b3f6c; background: #f5f9fe; }
   </style>
@@ -1557,27 +1567,68 @@ input:focus, select:focus, textarea:focus {
 </html>`;
     }
 
-    async function saveReportFile() {
-      const html = buildStandaloneReportHtml();
-      const filename = buildReportFilename('html');
-      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    function buildReportExportData() {
+      const doseRows = calculateMainDoses();
+      const reportDateDisplay = formatReportDate(inputs.reportDate.value);
+      const chemicalRows = doseRows.map(row => ({
+        chemical: row.name,
+        qty: row.roundedValue !== null && row.roundedValue > 0 ? row.displayValue : '',
+        unit: row.unit || '',
+        reason: row.roundedValue !== null && row.roundedValue > 0 ? getChemicalReason(row) : '',
+        dosed: inputs[`doseStatus_${row.key}`]?.value === 'yes' ? 'Yes' : 'No',
+        notes: row.displayNote || ''
+      }));
 
+      return {
+        doseRows,
+        reportDateDisplay,
+        correctiveAction: buildCorrectiveActionText(doseRows),
+        metadata: {
+          site: inputs.reportSite.value || '',
+          poolName: inputs.reportPoolName.value || '',
+          technician: inputs.reportTechnician.value || '',
+          date: reportDateDisplay,
+          waterClarity: inputs.waterClarity.value || '',
+          volume: inputs.activeVolume.value || '',
+          testTime: inputs.testTime.value || ''
+        },
+        readings: {
+          freeChlorine: inputs.freeChlorine.value || '',
+          targetFreeChlorine: inputs.targetFreeChlorine.value || '',
+          ph: inputs.ph.value || '',
+          targetPh: inputs.targetPh.value || '',
+          alkalinity: inputs.alkalinity.value || '',
+          targetAlkalinity: inputs.targetAlkalinity.value || '',
+          calciumHardness: inputs.calciumHardness.value || '',
+          targetCalcium: inputs.targetCalcium.value || '',
+          cyanuricAcid: inputs.cyanuricAcid.value || '',
+          targetCya: inputs.targetCya.value || '',
+          copper: inputs.copper.value || '',
+          salt: inputs.salt.value || '',
+          targetSalt: inputs.targetSalt.value || '',
+          phosphates: inputs.phosphates.value || ''
+        },
+        chemicalRows
+      };
+    }
+
+    async function saveBlobToDevice(blob, filename, fileType, shareText, successMessage, fallbackMessage) {
       if (navigator.share && window.File) {
-        const file = new File([blob], filename, { type: 'text/html' });
+        const file = new File([blob], filename, { type: fileType });
         try {
-          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          if (!navigator.canShare || navigator.canShare({ files: [file] })) {
             await navigator.share({
               title: 'Water Quality Testing Report',
-              text: 'Choose Save to Files to store this report on your iPhone.',
+              text: shareText,
               files: [file]
             });
-            setImportStatus('Report generated. Choose Save to Files on your iPhone.');
-            return;
+            setImportStatus(successMessage);
+            return true;
           }
         } catch (error) {
           if (error && error.name === 'AbortError') {
             setImportStatus('Save cancelled.');
-            return;
+            return true;
           }
         }
       }
@@ -1590,7 +1641,103 @@ input:focus, select:focus, textarea:focus {
       link.click();
       link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 2000);
-      setImportStatus('Report file generated. Save it from your iPhone downloads/files.');
+      setImportStatus(fallbackMessage);
+      return true;
+    }
+
+    async function saveReportFile() {
+      await saveExcelReportFile();
+    }
+
+    async function saveExcelReportFile() {
+      if (!window.XLSX) {
+        setImportStatus('Excel export library did not load. Please refresh and try again.');
+        return;
+      }
+
+      const exportData = buildReportExportData();
+
+      const summarySheet = XLSX.utils.aoa_to_sheet([
+        ['Water Quality Testing Report'],
+        [],
+        ['Site', exportData.metadata.site, 'Pool / Spa', exportData.metadata.poolName],
+        ['Technician', exportData.metadata.technician, 'Date', exportData.metadata.date],
+        ['Water clarity', exportData.metadata.waterClarity, 'Volume (L)', exportData.metadata.volume],
+        ['Test time', exportData.metadata.testTime || ''],
+        [],
+        ['Water Test Results'],
+        ['Free Chlorine', 'Target FC', 'pH', 'Target pH', 'Alkalinity', 'Target Alkalinity', 'Calcium', 'Target Calcium', 'CYA', 'Target CYA', 'Copper', 'Salt', 'Target Salt', 'Phosphates'],
+        [
+          exportData.readings.freeChlorine,
+          exportData.readings.targetFreeChlorine,
+          exportData.readings.ph,
+          exportData.readings.targetPh,
+          exportData.readings.alkalinity,
+          exportData.readings.targetAlkalinity,
+          exportData.readings.calciumHardness,
+          exportData.readings.targetCalcium,
+          exportData.readings.cyanuricAcid,
+          exportData.readings.targetCya,
+          exportData.readings.copper,
+          exportData.readings.salt,
+          exportData.readings.targetSalt,
+          exportData.readings.phosphates
+        ],
+        [],
+        ['Corrective Action / Technician Notes'],
+        [exportData.correctiveAction]
+      ]);
+
+      summarySheet['!cols'] = [
+        { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 22 },
+        { wch: 14 }, { wch: 18 }, { wch: 14 }, { wch: 18 },
+        { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 12 },
+        { wch: 14 }, { wch: 14 }
+      ];
+      summarySheet['!merges'] = [
+        XLSX.utils.decode_range('A1:D1'),
+        XLSX.utils.decode_range('A8:N8'),
+        XLSX.utils.decode_range('A12:N12'),
+        XLSX.utils.decode_range('A13:N13')
+      ];
+      summarySheet['!pageSetup'] = { orientation: 'landscape', fitToWidth: 1, fitToHeight: 0 };
+
+      const chemicalsSheet = XLSX.utils.json_to_sheet(exportData.chemicalRows.map(row => ({
+        'Chemical used': row.chemical,
+        'Qty': row.qty,
+        'Unit': row.unit,
+        'Reason': row.reason,
+        'Dosed?': row.dosed,
+        'Notes': row.notes
+      })));
+      chemicalsSheet['!cols'] = [
+        { wch: 28 },
+        { wch: 12 },
+        { wch: 10 },
+        { wch: 34 },
+        { wch: 10 },
+        { wch: 34 }
+      ];
+      chemicalsSheet['!pageSetup'] = { orientation: 'landscape', fitToWidth: 1, fitToHeight: 0 };
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, summarySheet, 'Report');
+      XLSX.utils.book_append_sheet(workbook, chemicalsSheet, 'Chemicals');
+
+      const excelArray = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob(
+        [excelArray],
+        { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
+      );
+
+      await saveBlobToDevice(
+        blob,
+        buildReportFilename('xlsx'),
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Choose Save to Files to store this Excel report on your iPhone.',
+        'Excel report generated. Choose Save to Files on your iPhone.',
+        'Excel report generated. Save it from your iPhone downloads/files.'
+      );
     }
 
     function buildReportText() {
@@ -2188,9 +2335,7 @@ input:focus, select:focus, textarea:focus {
       });
 
       el('resetBtn').addEventListener('click', resetAll);
-      const copyReportBtn = el('copyReportBtn');
-      if (copyReportBtn) copyReportBtn.addEventListener('click', copyReport);
-      el('saveReportBtn').addEventListener('click', saveReportFile);
+      el('saveReportBtn').addEventListener('click', saveExcelReportFile);
       el('takePhotoBtn').addEventListener('click', () => cameraInput.click());
       el('choosePhotoBtn').addEventListener('click', () => libraryInput.click());
       reReadBtn.addEventListener('click', readSelectedPhoto);
