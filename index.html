@@ -997,12 +997,83 @@ input:focus, select:focus, textarea:focus {
         <textarea id="reportTextOutput" class="report-raw" readonly></textarea>
       </section>
 
+
+      <!-- Additional Calculations card -->
+      <section class="card span-6">
+        <h2>Additional Calculations</h2>
+        <div class="field-grid">
+          <div class="field">
+            <label for="waterTemp">Water temperature (°C)</label>
+            <input id="waterTemp" type="number" step="0.1" placeholder="25" />
+            <small>Used for LSI calculation. If blank, defaults to 25°C.</small>
+          </div>
+          <div class="field">
+            <label for="waterTds">Total dissolved solids (ppm)</label>
+            <input id="waterTds" type="number" step="1" placeholder="1000" />
+            <small>Used for LSI calculation. If blank, defaults to 1000&nbsp;ppm.</small>
+          </div>
+          <div class="field">
+            <label>Langelier Saturation Index (LSI)</label>
+            <input id="lsiValue" type="text" readonly />
+            <small id="lsiStatus"></small>
+          </div>
+          <div class="field">
+            <label for="pumpFlow">Pump flow rate (L/hr)</label>
+            <input id="pumpFlow" type="number" step="1" min="0" placeholder="e.g. 15000" />
+          </div>
+          <div class="field">
+            <label>Turnover time</label>
+            <input id="turnoverHours" type="text" readonly />
+            <small>Time to circulate the active volume once.</small>
+          </div>
+        </div>
+      </section>
+
+      <!-- History and trends card -->
+      <section class="card span-6">
+        <h2>History &amp; Trends</h2>
+        <div class="actions">
+          <button class="button secondary" type="button" id="saveTestBtn">Save Current Test</button>
+        </div>
+        <div class="table-wrap" style="margin-top: 12px;">
+          <table id="historyTable">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>pH</th>
+                <th>Free Cl</th>
+                <th>Alk</th>
+                <th>Calcium</th>
+                <th>LSI</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div style="margin-top: 12px;">
+          <canvas id="historyChart" height="180"></canvas>
+        </div>
+      </section>
+
+      <!-- Maintenance tasks card -->
+      <section class="card span-12">
+        <h2>Maintenance Tasks</h2>
+        <div class="actions" style="flex-wrap: wrap; gap: 8px;">
+          <input id="newTaskDesc" type="text" placeholder="Task description" style="flex: 1 1 200px; min-width: 180px;" />
+          <input id="newTaskDue" type="date" style="flex: 0 0 auto;" />
+          <button class="button secondary" type="button" id="addTaskBtn">Add Task</button>
+        </div>
+        <div id="tasksList" style="margin-top: 12px;"></div>
+      </section>
+
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+  <!-- Chart.js for history and trend visualisations -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script>
     const STORAGE_KEY = 'mbsfm_pool_dosing_calculator_v5';
 
@@ -2111,7 +2182,210 @@ input:focus, select:focus, textarea:focus {
       const doseRows = calculateMainDoses();
       calculateIceBaths();
       updateReport(doseRows);
+      updateAdditionalCalculations();
       saveState();
+    }
+
+    // --- Additional functionality for LSI, history, and maintenance tasks ---
+    const HISTORY_KEY = 'mbsfm_pool_dosing_history';
+    const TASKS_KEY = 'mbsfm_pool_dosing_tasks';
+    let historyData = [];
+    let historyChart;
+
+    function computeLsi(ph, alkalinity, calcium, tds, temp) {
+      if (ph === null || alkalinity === null || calcium === null || alkalinity <= 0 || calcium <= 0) return null;
+      const _tds = tds && tds > 0 ? tds : 1000;
+      const _temp = temp && temp > 0 ? temp : 25;
+      const A = (Math.log10(_tds) - 1) / 10;
+      const B = -13.12 * Math.log10(_temp + 273) + 34.55;
+      const C = Math.log10(calcium) - 0.4;
+      const D = Math.log10(alkalinity);
+      const pHs = (9.3 + A + B) - (C + D);
+      return ph - pHs;
+    }
+
+    function computeTurnoverHours(volume, flow) {
+      if (volume === null || !flow || flow <= 0) return null;
+      return volume / flow;
+    }
+
+    function updateAdditionalCalculations() {
+      const ph = toNumber(inputs.ph.value);
+      const alk = toNumber(inputs.alkalinity.value);
+      const calcium = toNumber(inputs.calciumHardness.value);
+      const temp = toNumber(document.getElementById('waterTemp')?.value);
+      const tds = toNumber(document.getElementById('waterTds')?.value);
+      const lsi = computeLsi(ph, alk, calcium, tds, temp);
+      const lsiInput = document.getElementById('lsiValue');
+      const lsiStatus = document.getElementById('lsiStatus');
+      if (lsiInput) {
+        lsiInput.value = lsi !== null && !Number.isNaN(lsi) ? lsi.toFixed(2) : '';
+        if (lsiStatus) {
+          if (lsi === null || Number.isNaN(lsi)) {
+            lsiStatus.textContent = '';
+          } else if (lsi < -0.3) {
+            lsiStatus.textContent = 'Corrosive (LSI low)';
+            lsiStatus.style.color = getComputedStyle(document.documentElement).getPropertyValue('--bad') || '#b42318';
+          } else if (lsi > 0.3) {
+            lsiStatus.textContent = 'Scaling (LSI high)';
+            lsiStatus.style.color = getComputedStyle(document.documentElement).getPropertyValue('--warn') || '#b36b00';
+          } else {
+            lsiStatus.textContent = 'Balanced';
+            lsiStatus.style.color = getComputedStyle(document.documentElement).getPropertyValue('--good') || '#0f8a4b';
+          }
+        }
+      }
+      const volume = toNumber(inputs.activeVolume.value);
+      const flow = toNumber(document.getElementById('pumpFlow')?.value);
+      const turnover = computeTurnoverHours(volume, flow);
+      const turnoverInput = document.getElementById('turnoverHours');
+      if (turnoverInput) {
+        turnoverInput.value = turnover !== null && !Number.isNaN(turnover) ? turnover.toFixed(2) + ' hr' : '';
+      }
+    }
+
+    function loadHistory() {
+      try {
+        const raw = localStorage.getItem(HISTORY_KEY);
+        historyData = raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        historyData = [];
+      }
+    }
+
+    function saveHistory() {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(historyData));
+    }
+
+    function renderHistory() {
+      const tableBody = document.querySelector('#historyTable tbody');
+      if (tableBody) {
+        tableBody.innerHTML = historyData.map(item => {
+          return `<tr>
+            <td>${escapeHtml(item.date)}</td>
+            <td>${item.ph !== null && item.ph !== undefined ? escapeHtml(formatNumber(item.ph, 2)) : '-'}</td>
+            <td>${item.freeCl !== null && item.freeCl !== undefined ? escapeHtml(formatNumber(item.freeCl, 2)) : '-'}</td>
+            <td>${item.alk !== null && item.alk !== undefined ? escapeHtml(formatNumber(item.alk, 0)) : '-'}</td>
+            <td>${item.calcium !== null && item.calcium !== undefined ? escapeHtml(formatNumber(item.calcium, 0)) : '-'}</td>
+            <td>${item.lsi !== null && item.lsi !== undefined ? escapeHtml(item.lsi.toFixed(2)) : '-'}</td>
+          </tr>`;
+        }).join('');
+      }
+      const ctxEl = document.getElementById('historyChart');
+      if (ctxEl && window.Chart) {
+        const labels = historyData.map(item => item.date);
+        const phData = historyData.map(item => (item.ph !== null ? Number(item.ph) : null));
+        const fcData = historyData.map(item => (item.freeCl !== null ? Number(item.freeCl) : null));
+        if (historyChart) {
+          historyChart.destroy();
+        }
+        const ctx = ctxEl.getContext('2d');
+        historyChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: 'pH',
+                data: phData,
+                borderColor: '#2b96ff',
+                backgroundColor: 'rgba(43,150,255,0.1)',
+                tension: 0.2,
+                spanGaps: true
+              },
+              {
+                label: 'Free Cl (ppm)',
+                data: fcData,
+                borderColor: '#ff9800',
+                backgroundColor: 'rgba(255,152,0,0.1)',
+                tension: 0.2,
+                spanGaps: true
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { y: { beginAtZero: false } },
+            plugins: { legend: { position: 'top' } }
+          }
+        });
+      }
+    }
+
+    function addTestToHistory() {
+      const dateStr = inputs.reportDate && inputs.reportDate.value ? formatReportDate(inputs.reportDate.value) : new Date().toLocaleDateString();
+      const record = {
+        date: dateStr,
+        ph: toNumber(inputs.ph.value),
+        freeCl: toNumber(inputs.freeChlorine.value),
+        alk: toNumber(inputs.alkalinity.value),
+        calcium: toNumber(inputs.calciumHardness.value),
+        lsi: computeLsi(
+          toNumber(inputs.ph.value),
+          toNumber(inputs.alkalinity.value),
+          toNumber(inputs.calciumHardness.value),
+          toNumber(document.getElementById('waterTds')?.value),
+          toNumber(document.getElementById('waterTemp')?.value)
+        )
+      };
+      historyData.push(record);
+      historyData = historyData.slice(-50);
+      saveHistory();
+      renderHistory();
+    }
+
+    let tasks = [];
+
+    function loadTasks() {
+      try {
+        const raw = localStorage.getItem(TASKS_KEY);
+        tasks = raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        tasks = [];
+      }
+    }
+
+    function saveTasks() {
+      localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+    }
+
+    function renderTasks() {
+      const listEl = document.getElementById('tasksList');
+      if (!listEl) return;
+      listEl.innerHTML = tasks.map(task => {
+        const dueLabel = task.due ? task.due : '';
+        const checkedAttr = task.complete ? 'checked' : '';
+        return `<div class="task-item" style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+          <input type="checkbox" data-task-id="${task.id}" ${checkedAttr} style="flex:0 0 auto;">
+          <div style="flex:1 1 auto;">
+            <div style="font-size:14px; ${task.complete ? 'text-decoration: line-through; color: var(--muted);' : ''}">${escapeHtml(task.desc)}</div>
+            ${dueLabel ? `<div style="font-size:12px; color: var(--muted);">Due: ${escapeHtml(dueLabel)}</div>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    function addTask() {
+      const descInput = document.getElementById('newTaskDesc');
+      const dueInput = document.getElementById('newTaskDue');
+      const desc = descInput ? descInput.value.trim() : '';
+      const due = dueInput ? dueInput.value : '';
+      if (!desc) return;
+      tasks.push({ id: Date.now().toString(), desc, due, complete: false });
+      saveTasks();
+      renderTasks();
+      if (descInput) descInput.value = '';
+      if (dueInput) dueInput.value = '';
+    }
+
+    function toggleTaskComplete(taskId, checked) {
+      const idx = tasks.findIndex(t => t.id === taskId);
+      if (idx >= 0) {
+        tasks[idx].complete = checked;
+        saveTasks();
+        renderTasks();
+      }
     }
 
     function buildSummaryText() {
@@ -2538,6 +2812,43 @@ input:focus, select:focus, textarea:focus {
     }
 
     init();
+    try {
+      loadHistory();
+      renderHistory();
+    } catch (err) {
+      console.warn('History could not be loaded:', err);
+    }
+    try {
+      loadTasks();
+      renderTasks();
+    } catch (err) {
+      console.warn('Tasks could not be loaded:', err);
+    }
+    updateAdditionalCalculations();
+    const saveBtn = document.getElementById('saveTestBtn');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', addTestToHistory);
+    }
+    const addTaskBtn = document.getElementById('addTaskBtn');
+    if (addTaskBtn) {
+      addTaskBtn.addEventListener('click', addTask);
+    }
+    const tasksListEl = document.getElementById('tasksList');
+    if (tasksListEl) {
+      tasksListEl.addEventListener('change', (event) => {
+        const target = event.target;
+        if (target && target.getAttribute('data-task-id')) {
+          toggleTaskComplete(target.getAttribute('data-task-id'), target.checked);
+        }
+      });
+    }
+    ['waterTemp','waterTds','pumpFlow'].forEach((id) => {
+      const inputEl = document.getElementById(id);
+      if (inputEl) {
+        inputEl.addEventListener('input', updateAdditionalCalculations);
+        inputEl.addEventListener('change', updateAdditionalCalculations);
+      }
+    });
   </script>
 </body>
 </html>
