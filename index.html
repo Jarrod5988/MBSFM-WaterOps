@@ -1127,28 +1127,54 @@
     function normalizeOcrText(text) {
       return (text || '')
         .replace(/[|]/g, 'I')
+        .replace(/[\[\]{}()]/g, ' ')
         .replace(/[\u2013\u2014]/g, '-')
         .replace(/\r/g, '\n')
         .replace(/[ ]{2,}/g, ' ')
         .replace(/\bFCI\b/g, 'FCL')
         .replace(/\bFEL\b/g, 'FCL')
         .replace(/\bFGL\b/g, 'FCL')
+        .replace(/\bFOL\b/g, 'FCL')
+        .replace(/\bFOL\b/g, 'FCL')
         .replace(/\bAIK\b/g, 'ALK')
         .replace(/\bALX\b/g, 'ALK')
+        .replace(/\bAX\b/g, 'ALK')
+        .replace(/\bAK\b/g, 'ALK')
         .replace(/\bCY4\b/g, 'CYA')
         .replace(/\bCVA\b/g, 'CYA')
         .replace(/\bPH0S\b/g, 'PHOS')
+        .replace(/\bPHO\b/g, 'PHOS')
         .toUpperCase();
+    }
+
+    function coerceOcrNumber(fieldName, rawValue) {
+      if (rawValue === null || rawValue === undefined) return null;
+      const text = String(rawValue).trim().replace(/,/g, '.').replace(/[^0-9.]/g, '');
+      if (!text) return null;
+
+      let value = Number(text);
+      if (!Number.isFinite(value)) return null;
+
+      if (fieldName === 'ph') {
+        if (!text.includes('.')) {
+          if (value >= 60 && value <= 89) value = value / 10;
+          else if (value >= 600 && value <= 890) value = value / 100;
+        }
+        value = Math.round(value * 100) / 100;
+        if (value < 4 || value > 10) return null;
+      }
+
+      return value;
     }
 
     function parseSpinTouchText(text) {
       const cleaned = normalizeOcrText(text);
 
-      const findValue = (...patterns) => {
+      const findValue = (fieldName, ...patterns) => {
         for (const pattern of patterns) {
           const match = cleaned.match(pattern);
           if (!match) continue;
-          const value = Number(String(match[1]).replace(',', '.'));
+          const value = coerceOcrNumber(fieldName, match[1]);
           if (Number.isFinite(value)) return value;
         }
         return null;
@@ -1157,14 +1183,14 @@
       const testTimeMatch = cleaned.match(/TEST\s*TIME\s*[:=]?\s*([0-9: ]+[APM]{0,2}(?:\s+[0-9]{1,2}-[A-Z]{3}-[0-9]{4})?)/);
       return {
         testTime: testTimeMatch ? testTimeMatch[1].trim() : '',
-        freeChlorine: findValue(/\bFCL\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/, /\bF\s*C\s*L\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/),
-        ph: findValue(/\bPH\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/, /\bP\s*H\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/),
-        alkalinity: findValue(/\bALK\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/),
-        calciumHardness: findValue(/\bHARD\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/, /\bHAR[D0O]\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/),
-        cyanuricAcid: findValue(/\bCYA\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/),
-        copper: findValue(/\bCOPP(?:ER|FR|EF)\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/, /\bCOPPER\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/),
-        phosphates: findValue(/\bPHOS\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/, /\bPH[O0]S\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/),
-        salt: findValue(/\bSALT\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/)
+        freeChlorine: findValue('freeChlorine', /\bFCL\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/, /\bF\s*[CO0]?\s*L\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/),
+        ph: findValue('ph', /\bPH\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/, /\bP\s*H\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/),
+        alkalinity: findValue('alkalinity', /\bALK\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/, /(?:^|\s)A\s*[LKX]\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/),
+        calciumHardness: findValue('calciumHardness', /\bHARD\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/, /\bHAR[D0O]\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/),
+        cyanuricAcid: findValue('cyanuricAcid', /\bCYA\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/),
+        copper: findValue('copper', /\bCOPP(?:ER|FR|EF)\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/, /\bCOPPER\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/),
+        phosphates: findValue('phosphates', /\bPHOS\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/, /\bPH[O0]S\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/),
+        salt: findValue('salt', /\bSALT\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/)
       };
     }
 
@@ -1174,7 +1200,8 @@
         .length;
     }
 
-    function fillImportedValues(parsed) {
+    function fillImportedValues(parsed, options = {}) {
+      const { clearMissing = false } = options;
       const mapping = {
         freeChlorine: 'freeChlorine',
         ph: 'ph',
@@ -1188,9 +1215,12 @@
 
       let filledCount = 0;
       Object.entries(mapping).forEach(([key, inputId]) => {
+        const input = el(inputId);
         if (parsed[key] !== null && parsed[key] !== undefined) {
-          el(inputId).value = parsed[key];
+          input.value = parsed[key];
           filledCount += 1;
+        } else if (clearMissing) {
+          input.value = '';
         }
       });
       inputs.testTime.value = parsed.testTime || '';
@@ -1200,7 +1230,7 @@
 
     function applyOcrText() {
       const parsed = parseSpinTouchText(inputs.ocrText.value);
-      const filledCount = fillImportedValues(parsed);
+      const filledCount = fillImportedValues(parsed, { clearMissing: true });
       if (filledCount > 0) {
         setImportStatus(`Filled ${filledCount} test result fields from OCR text${parsed.testTime ? ' and the test time' : ''}.`);
       } else {
@@ -1249,7 +1279,7 @@
         }
 
         inputs.ocrText.value = bestText.trim();
-        const filledCount = fillImportedValues(bestParsed);
+        const filledCount = fillImportedValues(bestParsed, { clearMissing: true });
 
         if (filledCount > 0) {
           setImportStatus(`Photo imported. Filled ${filledCount} test result fields${bestParsed.testTime ? ' and the test time' : ''}. Check the values and adjust if needed.`);
