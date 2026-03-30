@@ -958,7 +958,7 @@ input:focus, select:focus, textarea:focus {
       <section class="card span-12">
         <h2>Water Quality Testing Report</h2>
         <div class="actions">
-          <button class="button icon-button" type="button" id="saveReportBtn"><span class="button-icon" aria-hidden="true">📊</span><span>Generate &amp; Save Report</span></button>
+          <button class="button icon-button" type="button" id="saveReportBtn"><span class="button-icon" aria-hidden="true">📄</span><span>Generate &amp; Save PDF Report</span></button>
         </div>
         <div class="field-grid" style="margin-top: 12px;">
           <div class="field">
@@ -1001,7 +1001,8 @@ input:focus, select:focus, textarea:focus {
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
   <script>
     const STORAGE_KEY = 'mbsfm_pool_dosing_calculator_v5';
 
@@ -1646,97 +1647,274 @@ input:focus, select:focus, textarea:focus {
     }
 
     async function saveReportFile() {
-      await saveExcelReportFile();
+      await savePdfReportFile();
     }
 
-    async function saveExcelReportFile() {
-      if (!window.XLSX) {
-        setImportStatus('Excel export library did not load. Please refresh and try again.');
+    function addPdfFooter(doc) {
+      const pageCount = doc.getNumberOfPages();
+      const width = doc.internal.pageSize.getWidth();
+      const height = doc.internal.pageSize.getHeight();
+      for (let page = 1; page <= pageCount; page += 1) {
+        doc.setPage(page);
+        doc.setFontSize(8);
+        doc.setTextColor(102, 113, 133);
+        doc.text(`Page ${page} of ${pageCount}`, width - 14, height - 6, { align: 'right' });
+        doc.text('Generated from the calculator', 14, height - 6);
+      }
+    }
+
+    async function savePdfReportFile() {
+      if (!window.jspdf || !window.jspdf.jsPDF) {
+        setImportStatus('PDF export library did not load. Please refresh and try again.');
         return;
       }
 
+      const { jsPDF } = window.jspdf;
       const exportData = buildReportExportData();
+      const doc = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4',
+        compress: true
+      });
 
-      const summarySheet = XLSX.utils.aoa_to_sheet([
-        ['Water Quality Testing Report'],
-        [],
-        ['Site', exportData.metadata.site, 'Pool / Spa', exportData.metadata.poolName],
-        ['Technician', exportData.metadata.technician, 'Date', exportData.metadata.date],
-        ['Water clarity', exportData.metadata.waterClarity, 'Volume (L)', exportData.metadata.volume],
-        ['Test time', exportData.metadata.testTime || ''],
-        [],
-        ['Water Test Results'],
-        ['Free Chlorine', 'Target FC', 'pH', 'Target pH', 'Alkalinity', 'Target Alkalinity', 'Calcium', 'Target Calcium', 'CYA', 'Target CYA', 'Copper', 'Salt', 'Target Salt', 'Phosphates'],
-        [
-          exportData.readings.freeChlorine,
-          exportData.readings.targetFreeChlorine,
-          exportData.readings.ph,
-          exportData.readings.targetPh,
-          exportData.readings.alkalinity,
-          exportData.readings.targetAlkalinity,
-          exportData.readings.calciumHardness,
-          exportData.readings.targetCalcium,
-          exportData.readings.cyanuricAcid,
-          exportData.readings.targetCya,
-          exportData.readings.copper,
-          exportData.readings.salt,
-          exportData.readings.targetSalt,
-          exportData.readings.phosphates
-        ],
-        [],
-        ['Corrective Action / Technician Notes'],
-        [exportData.correctiveAction]
-      ]);
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 10;
+      const usableWidth = pageWidth - (margin * 2);
+      let y = 12;
 
-      summarySheet['!cols'] = [
-        { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 22 },
-        { wch: 14 }, { wch: 18 }, { wch: 14 }, { wch: 18 },
-        { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 12 },
-        { wch: 14 }, { wch: 14 }
+      doc.setDrawColor(207, 216, 227);
+      doc.setLineWidth(0.3);
+      doc.setFillColor(15, 69, 115);
+      doc.roundedRect(margin, y, usableWidth, 12, 2, 2, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.setTextColor(255, 255, 255);
+      doc.text('Water Quality Testing Report', margin + 6, y + 8.2);
+      y += 16;
+
+      const leftBoxW = 72;
+      const gap = 6;
+      const rightBoxW = usableWidth - leftBoxW - gap;
+      const boxH = 30;
+
+      doc.setFillColor(251, 253, 255);
+      doc.setDrawColor(207, 216, 227);
+      doc.roundedRect(margin, y, leftBoxW, boxH, 2, 2, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(11, 63, 108);
+      doc.text('MBS Facility Maintenance', margin + 4, y + 6);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(31, 41, 55);
+      const companyLines = [
+        '63 Tennant Street',
+        'Fyshwick ACT 2609',
+        '(02) 6162 0216',
+        'info@mbsfm.com.au'
       ];
-      summarySheet['!merges'] = [
-        XLSX.utils.decode_range('A1:D1'),
-        XLSX.utils.decode_range('A8:N8'),
-        XLSX.utils.decode_range('A12:N12'),
-        XLSX.utils.decode_range('A13:N13')
+      companyLines.forEach((line, index) => {
+        doc.text(line, margin + 4, y + 11 + (index * 4.6));
+      });
+
+      const rightX = margin + leftBoxW + gap;
+      doc.roundedRect(rightX, y, rightBoxW, boxH, 2, 2, 'FD');
+      const metaPairs = [
+        ['Site', exportData.metadata.site],
+        ['Technician', exportData.metadata.technician],
+        ['Pool / Spa', exportData.metadata.poolName],
+        ['Date', exportData.metadata.date],
+        ['Water clarity', exportData.metadata.waterClarity],
+        ['Volume (L)', exportData.metadata.volume],
+        ['Test time', exportData.metadata.testTime || '']
       ];
-      summarySheet['!pageSetup'] = { orientation: 'landscape', fitToWidth: 1, fitToHeight: 0 };
 
-      const chemicalsSheet = XLSX.utils.json_to_sheet(exportData.chemicalRows.map(row => ({
-        'Chemical used': row.chemical,
-        'Qty': row.qty,
-        'Unit': row.unit,
-        'Reason': row.reason,
-        'Dosed?': row.dosed,
-        'Notes': row.notes
-      })));
-      chemicalsSheet['!cols'] = [
-        { wch: 28 },
-        { wch: 12 },
-        { wch: 10 },
-        { wch: 34 },
-        { wch: 10 },
-        { wch: 34 }
-      ];
-      chemicalsSheet['!pageSetup'] = { orientation: 'landscape', fitToWidth: 1, fitToHeight: 0 };
+      const leftMetaX = rightX + 4;
+      const rightMetaX = rightX + (rightBoxW / 2) + 2;
+      metaPairs.forEach((pair, index) => {
+        const columnX = index % 2 === 0 ? leftMetaX : rightMetaX;
+        const row = Math.floor(index / 2);
+        const rowY = y + 6 + (row * 6);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9.5);
+        doc.setTextColor(11, 63, 108);
+        doc.text(`${pair[0]}:`, columnX, rowY);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(31, 41, 55);
+        const text = String(pair[1] || '-');
+        doc.text(doc.splitTextToSize(text, (rightBoxW / 2) - 20), columnX + 18, rowY);
+      });
 
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, summarySheet, 'Report');
-      XLSX.utils.book_append_sheet(workbook, chemicalsSheet, 'Chemicals');
+      y += boxH + 6;
 
-      const excelArray = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-      const blob = new Blob(
-        [excelArray],
-        { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
-      );
+      doc.autoTable({
+        startY: y,
+        margin: { left: margin, right: margin },
+        theme: 'grid',
+        styles: {
+          font: 'helvetica',
+          fontSize: 7,
+          cellPadding: 1.6,
+          textColor: [31, 41, 55],
+          lineColor: [219, 230, 242],
+          lineWidth: 0.2,
+          overflow: 'linebreak',
+          valign: 'middle'
+        },
+        headStyles: {
+          fillColor: [45, 134, 213],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          halign: 'center'
+        },
+        columnStyles: {
+          0: { cellWidth: 18 },
+          1: { cellWidth: 14 },
+          2: { cellWidth: 14 },
+          3: { cellWidth: 12 },
+          4: { cellWidth: 14 },
+          5: { cellWidth: 16 },
+          6: { cellWidth: 17 },
+          7: { cellWidth: 18 },
+          8: { cellWidth: 14 },
+          9: { cellWidth: 12 },
+          10: { cellWidth: 12 },
+          11: { cellWidth: 12 }
+        },
+        head: [[
+          'Water Clarity', 'Free Chlorine', 'Target FC', 'pH', 'Target pH',
+          'Alkalinity', 'Target Alk', 'Volume (L)', 'Calcium', 'CYA', 'Copper', 'Salt'
+        ]],
+        body: [[
+          exportData.metadata.waterClarity || '',
+          exportData.readings.freeChlorine || '',
+          exportData.readings.targetFreeChlorine || '',
+          exportData.readings.ph || '',
+          exportData.readings.targetPh || '',
+          exportData.readings.alkalinity || '',
+          exportData.readings.targetAlkalinity || '',
+          exportData.metadata.volume || '',
+          exportData.readings.calciumHardness || '',
+          exportData.readings.cyanuricAcid || '',
+          exportData.readings.copper || '',
+          exportData.readings.salt || ''
+        ]],
+        didDrawPage: (data) => {
+          doc.setFillColor(15, 69, 115);
+          doc.rect(margin, data.settings.startY - 6, usableWidth, 5, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10);
+          doc.setTextColor(255, 255, 255);
+          doc.text('Water Test Results', margin + 3, data.settings.startY - 2.4);
+        }
+      });
 
+      y = (doc.lastAutoTable?.finalY || y) + 8;
+
+      doc.autoTable({
+        startY: y,
+        margin: { left: margin, right: margin },
+        theme: 'grid',
+        styles: {
+          font: 'helvetica',
+          fontSize: 7.2,
+          cellPadding: 1.8,
+          textColor: [31, 41, 55],
+          lineColor: [219, 230, 242],
+          lineWidth: 0.2,
+          overflow: 'linebreak',
+          valign: 'top'
+        },
+        headStyles: {
+          fillColor: [45, 134, 213],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          halign: 'center'
+        },
+        columnStyles: {
+          0: { cellWidth: 44 },
+          1: { cellWidth: 16, halign: 'center' },
+          2: { cellWidth: 12, halign: 'center' },
+          3: { cellWidth: 56 },
+          4: { cellWidth: 16, halign: 'center' },
+          5: { cellWidth: 54 }
+        },
+        head: [[
+          'Chemical used', 'Qty', 'Unit', 'Reason', 'Dosed?', 'Notes'
+        ]],
+        body: exportData.chemicalRows.map(row => [
+          row.chemical || '',
+          row.qty || '',
+          row.unit || '',
+          row.reason || '',
+          row.dosed || '',
+          row.notes || ''
+        ]),
+        didDrawPage: (data) => {
+          doc.setFillColor(15, 69, 115);
+          doc.rect(margin, data.settings.startY - 6, usableWidth, 5, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10);
+          doc.setTextColor(255, 255, 255);
+          doc.text('Chemicals Added', margin + 3, data.settings.startY - 2.4);
+        }
+      });
+
+      y = (doc.lastAutoTable?.finalY || y) + 8;
+
+      const notesTitleH = 5;
+      const notesTitleY = y;
+      if (notesTitleY + 24 > pageHeight - 16) {
+        doc.addPage();
+        y = 14;
+      } else {
+        y = notesTitleY;
+      }
+
+      doc.setFillColor(15, 69, 115);
+      doc.rect(margin, y, usableWidth, notesTitleH, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(255, 255, 255);
+      doc.text('Corrective Action / Technician Notes', margin + 3, y + 3.6);
+      y += notesTitleH + 3;
+
+      doc.setDrawColor(207, 216, 227);
+      doc.setFillColor(255, 255, 255);
+      const notesText = exportData.correctiveAction || 'No corrective chemical addition currently required based on the entered readings and targets.';
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(31, 41, 55);
+      const splitNotes = doc.splitTextToSize(notesText, usableWidth - 8);
+      const noteBoxHeight = Math.max(14, (splitNotes.length * 4.2) + 6);
+
+      if (y + noteBoxHeight > pageHeight - 16) {
+        doc.addPage();
+        y = 14;
+        doc.setFillColor(15, 69, 115);
+        doc.rect(margin, y, usableWidth, notesTitleH, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(255, 255, 255);
+        doc.text('Corrective Action / Technician Notes', margin + 3, y + 3.6);
+        y += notesTitleH + 3;
+      }
+
+      doc.roundedRect(margin, y, usableWidth, noteBoxHeight, 2, 2, 'FD');
+      doc.text(splitNotes, margin + 4, y + 5);
+
+      addPdfFooter(doc);
+
+      const blob = doc.output('blob');
       await saveBlobToDevice(
         blob,
-        buildReportFilename('xlsx'),
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Choose Save to Files to store this Excel report on your iPhone.',
-        'Excel report generated. Choose Save to Files on your iPhone.',
-        'Excel report generated. Save it from your iPhone downloads/files.'
+        buildReportFilename('pdf'),
+        'application/pdf',
+        'Choose Save to Files to store this PDF report on your iPhone.',
+        'PDF report generated. Choose Save to Files on your iPhone.',
+        'PDF report generated. Save it from your iPhone downloads/files.'
       );
     }
 
