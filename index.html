@@ -346,7 +346,6 @@
         </div>
       </div>
       <div class="toolbar">
-        <button class="button secondary" id="copySummaryBtn" type="button">Copy dose summary</button>
         <button class="button ghost" id="resetBtn" type="button">Reset last pool test</button>
       </div>
     </div>
@@ -1317,7 +1316,6 @@
         }
       });
 
-      el('copySummaryBtn').addEventListener('click', copySummary);
       el('resetBtn').addEventListener('click', resetAll);
       el('takePhotoBtn').addEventListener('click', () => cameraInput.click());
       el('choosePhotoBtn').addEventListener('click', () => libraryInput.click());
