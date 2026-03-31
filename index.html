@@ -197,6 +197,21 @@
       gap: 12px;
     }
 
+    .quick-capture-grid {
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    }
+
+    @media (max-width: 480px) {
+      .quick-capture-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .quick-capture-grid input,
+      .quick-capture-grid select {
+        min-width: 0;
+      }
+    }
+
     .field {
       display: flex;
       flex-direction: column;
@@ -760,7 +775,7 @@
       </section>
       <section class="card span-12">
         <h2>Quick capture</h2>
-        <div class="field-grid" style="margin-bottom: 12px;">
+        <div class="field-grid quick-capture-grid" style="margin-bottom: 12px;">
           <div class="field">
             <label for="reportSite">Site</label>
             <input id="reportSite" type="text" placeholder="Enter site" />
