@@ -2524,5 +2524,119 @@ async function savePdfReport() {
 
     window.addEventListener('DOMContentLoaded', init);
   </script>
+  <div id="installPrompt" class="install-prompt hidden">
+  <div class="install-card">
+    <div class="install-header">
+      <img src="apple-touch-icon.png" alt="MBS FM" class="install-logo">
+      <div>
+        <h3>Add MBS FM to Home Screen</h3>
+        <p>Only needs to be done once on each phone.</p>
+      </div>
+    </div>
+
+    <ol>
+      <li>Tap the <strong>Share</strong> button in Safari</li>
+      <li>Tap <strong>Add to Home Screen</strong></li>
+      <li>Leave <strong>Open as Web App</strong> turned on</li>
+      <li>Tap <strong>Add</strong></li>
+    </ol>
+
+    <div class="install-actions">
+      <button id="installPromptClose" type="button">Got it</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .hidden { display: none !important; }
+
+  .install-prompt {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 9999;
+  }
+
+  .install-card {
+    width: 100%;
+    max-width: 420px;
+    background: #fff;
+    border-radius: 24px;
+    padding: 20px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.20);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  .install-header {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+
+  .install-logo {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+  }
+
+  .install-header h3 {
+    margin: 0 0 4px;
+    font-size: 20px;
+    color: #0b5ea8;
+  }
+
+  .install-header p {
+    margin: 0;
+    font-size: 14px;
+    color: #64748b;
+  }
+
+  .install-card ol {
+    margin: 0 0 18px 20px;
+    padding: 0;
+    color: #1e293b;
+    line-height: 1.6;
+  }
+
+  .install-actions button {
+    width: 100%;
+    border: 0;
+    border-radius: 14px;
+    padding: 14px;
+    background: #0b5ea8;
+    color: #fff;
+    font-weight: 700;
+    font-size: 16px;
+  }
+</style>
+
+<script>
+  (function () {
+    const seenKey = "mbsfm_install_prompt_seen";
+    const promptEl = document.getElementById("installPrompt");
+    const closeBtn = document.getElementById("installPromptClose");
+
+    const isIOS = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+    const isSafari = /safari/i.test(window.navigator.userAgent) && !/crios|fxios|edgios/i.test(window.navigator.userAgent);
+    const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+    const hasSeen = localStorage.getItem(seenKey) === "yes";
+
+    if (isIOS && isSafari && !isStandalone && !hasSeen) {
+      setTimeout(() => {
+        promptEl.classList.remove("hidden");
+      }, 800);
+    }
+
+    closeBtn.addEventListener("click", () => {
+      localStorage.setItem(seenKey, "yes");
+      promptEl.classList.add("hidden");
+    });
+  })();
+</script>
 </body>
 </html>
