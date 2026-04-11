@@ -1614,6 +1614,7 @@
     const STORAGE_KEY = 'mbs-pool-dosing-combined-v3';
     const STOCK_STORAGE_KEY = 'mbs-pool-stock-v1';
     const DOSE_KEYS = ['acid', 'chlorine', 'bicarb', 'calcium', 'stabiliser', 'salt'];
+    const GROUP_ICE_DOSING_KEYS = ['acid', 'chlorine', 'bicarb', 'calcium'];
     const QR_SIZE = 180;
     const HISTORY_STORAGE_KEY = 'mbs-pool-history-v1';
     const SITE_MEMORY_STORAGE_KEY = 'mbs-site-memory-v1';
@@ -2075,11 +2076,100 @@
       return { rec, rows, doses };
     }
 
+
+    function getIceBathDoseFieldSnapshot(index, key) {
+      const statusField = qs(`iceBath${index}DoseStatus_${key}`);
+      const sourceField = qs(`iceBath${index}DoseSource_${key}`);
+      const actualField = qs(`iceBath${index}DoseActual_${key}`);
+      const noteField = qs(`iceBath${index}DoseNote_${key}`);
+      return {
+        status: ((statusField && statusField.value) || 'No').toLowerCase(),
+        source: sourceField && sourceField.value ? sourceField.value : '',
+        actualQty: actualField && actualField.value !== '' ? n(actualField.value) : null,
+        note: noteField && noteField.value ? noteField.value.trim() : ''
+      };
+    }
+
+    function getCurrentIceBathDoseFieldValues(index) {
+      const snapshot = {};
+      GROUP_ICE_DOSING_KEYS.forEach(key => {
+        const statusField = qs(`iceBath${index}DoseStatus_${key}`);
+        const sourceField = qs(`iceBath${index}DoseSource_${key}`);
+        const actualField = qs(`iceBath${index}DoseActual_${key}`);
+        const noteField = qs(`iceBath${index}DoseNote_${key}`);
+        if (statusField) snapshot[`iceBath${index}DoseStatus_${key}`] = statusField.value;
+        if (sourceField) snapshot[`iceBath${index}DoseSource_${key}`] = sourceField.value;
+        if (actualField) snapshot[`iceBath${index}DoseActual_${key}`] = actualField.value;
+        if (noteField) snapshot[`iceBath${index}DoseNote_${key}`] = noteField.value;
+      });
+      return snapshot;
+    }
+
+    function restoreIceBathDoseFields(index, existingValues = null) {
+      try {
+        const stored = existingValues || JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+        GROUP_ICE_DOSING_KEYS.forEach(key => {
+          const statusField = qs(`iceBath${index}DoseStatus_${key}`);
+          const sourceField = qs(`iceBath${index}DoseSource_${key}`);
+          const actualField = qs(`iceBath${index}DoseActual_${key}`);
+          const noteField = qs(`iceBath${index}DoseNote_${key}`);
+          if (statusField && stored[`iceBath${index}DoseStatus_${key}`]) statusField.value = stored[`iceBath${index}DoseStatus_${key}`];
+          if (sourceField && stored[`iceBath${index}DoseSource_${key}`]) sourceField.value = stored[`iceBath${index}DoseSource_${key}`];
+          if (actualField && stored[`iceBath${index}DoseActual_${key}`] != null) actualField.value = stored[`iceBath${index}DoseActual_${key}`];
+          if (noteField && stored[`iceBath${index}DoseNote_${key}`]) noteField.value = stored[`iceBath${index}DoseNote_${key}`];
+        });
+      } catch (error) {
+        console.error('Failed restoring grouped ice bath dose fields', error);
+      }
+    }
+
+    function bindIceBathDoseFields(index) {
+      GROUP_ICE_DOSING_KEYS.forEach(key => {
+        const statusField = qs(`iceBath${index}DoseStatus_${key}`);
+        const sourceField = qs(`iceBath${index}DoseSource_${key}`);
+        const actualField = qs(`iceBath${index}DoseActual_${key}`);
+        const noteField = qs(`iceBath${index}DoseNote_${key}`);
+        [statusField, sourceField].forEach(field => {
+          if (field && !field.dataset.bound) {
+            field.addEventListener('change', handleDoseFieldChange);
+            field.dataset.bound = 'true';
+          }
+        });
+        [actualField, noteField].forEach(field => {
+          if (field && !field.dataset.bound) {
+            field.addEventListener('input', handleDoseFieldChange);
+            field.dataset.bound = 'true';
+          }
+        });
+      });
+    }
+
+    function buildIceBathChemicalRows(index, doses) {
+      return [
+        { key: 'acid', label: 'Hydrochloric Acid 32%', value: doses.acid || 0, unit: 'mL', decimals: 0, reason: 'Adjust pH toward target if required.' },
+        { key: 'chlorine', label: 'Liquid Chlorine 12.5%', value: doses.chlorine || 0, unit: 'mL', decimals: 0, reason: 'Lift free chlorine toward target if required.' },
+        { key: 'bicarb', label: 'Sodium Bicarbonate', value: doses.bicarb || 0, unit: 'kg', decimals: 2, reason: 'Lift alkalinity toward target if required.' },
+        { key: 'calcium', label: 'Calcium Chloride', value: doses.calcium || 0, unit: 'kg', decimals: 2, reason: 'Lift calcium hardness toward target if required.' }
+      ].map(item => {
+        const snapshot = getIceBathDoseFieldSnapshot(index, item.key);
+        const actualQty = snapshot.actualQty;
+        return {
+          ...item,
+          dosed: snapshot.status === 'yes' ? 'Yes' : 'No',
+          source: snapshot.source === 'ute' ? 'Ute stock' : snapshot.source === 'onsite' ? 'Stock onsite' : '',
+          actualQtyText: Number.isFinite(actualQty) && actualQty > 0 ? `${formatNumber(actualQty, item.decimals)} ${item.unit}` : '',
+          notes: snapshot.note || ''
+        };
+      });
+    }
+
     function renderIceBathRecommendationBlock(index) {
       const target = qs(`iceBath${index}Summary`);
       if (!target) return 0;
+      const currentFieldValues = getCurrentIceBathDoseFieldValues(index);
       const { rec, rows, doses } = buildIceBathRecommendationRows(index);
       const doseCount = Object.values(doses).filter(value => Number.isFinite(value) && value > 0).length;
+      const chemicalRows = buildIceBathChemicalRows(index, doses);
       target.innerHTML = `
         <div class="mini-pill"><strong>Volume</strong>6,000 L each</div>
         <div class="mini-pill"><strong>Clarity</strong>${escapeHtml(rec.clarity)}</div>
@@ -2111,25 +2201,46 @@
             </tbody>
           </table>
         </div>
-        <div class="dose-checklist" style="grid-column: 1 / -1; margin-top: 0;">
-          <div class="dose-row">
-            <div class="dose-row-top"><div class="dose-row-name">Hydrochloric Acid 32%</div><div class="dose-row-amount">${formatDose(doses.acid, 'mL', 0)}</div></div>
-            <div class="subtle">Retest pH after dosing.</div>
-          </div>
-          <div class="dose-row">
-            <div class="dose-row-top"><div class="dose-row-name">Liquid Chlorine 12.5%</div><div class="dose-row-amount">${formatDose(doses.chlorine, 'mL', 0)}</div></div>
-            <div class="subtle">Dose only if free chlorine needs to be lifted.</div>
-          </div>
-          <div class="dose-row">
-            <div class="dose-row-top"><div class="dose-row-name">Sodium Bicarbonate</div><div class="dose-row-amount">${formatDose(doses.bicarb, 'kg', 2)}</div></div>
-            <div class="subtle">Split the dose if a larger correction is needed.</div>
-          </div>
-          <div class="dose-row">
-            <div class="dose-row-top"><div class="dose-row-name">Calcium Chloride</div><div class="dose-row-amount">${formatDose(doses.calcium, 'kg', 2)}</div></div>
-            <div class="subtle">Only needed if calcium hardness is low.</div>
-          </div>
+        <div class="table-wrap" style="grid-column: 1 / -1; margin-top: 4px;">
+          <table class="stock-table">
+            <thead>
+              <tr>
+                <th>Chemical</th>
+                <th>Recommended dose</th>
+                <th>Dosed?</th>
+                <th>Stock source</th>
+                <th>Actual qty used</th>
+                <th>Note</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${chemicalRows.map(item => `
+                <tr>
+                  <td><strong>${escapeHtml(item.label)}</strong></td>
+                  <td>${formatDose(item.value, item.unit, item.decimals)}</td>
+                  <td>
+                    <select id="iceBath${index}DoseStatus_${item.key}">
+                      <option value="No">No</option>
+                      <option value="Yes">Yes</option>
+                    </select>
+                  </td>
+                  <td>
+                    <select id="iceBath${index}DoseSource_${item.key}">
+                      <option value="">Select</option>
+                      <option value="ute">Ute stock</option>
+                      <option value="onsite">Stock onsite</option>
+                    </select>
+                  </td>
+                  <td><input id="iceBath${index}DoseActual_${item.key}" type="number" step="any" inputmode="decimal" placeholder="Optional override" /></td>
+                  <td><input id="iceBath${index}DoseNote_${item.key}" type="text" placeholder="Optional note" /></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
         </div>
       `;
+      restoreIceBathDoseFields(index, currentFieldValues);
+      bindIceBathDoseFields(index);
       return doseCount;
     }
 
@@ -2585,7 +2696,16 @@
         const notes = [
           'Each ice bath is calculated separately at 6,000 L.',
           (inputs.serviceNotes.value || '').trim(),
-          baths.map(bath => `${bath.poolName}: clarity ${bath.clarity || '-'}, pH ${bath.ph == null ? '-' : formatNumber(bath.ph, 2)}, FC ${bath.fc == null ? '-' : formatNumber(bath.fc, 2)}, TC ${bath.tc == null ? '-' : formatNumber(bath.tc, 2)}, Alk ${bath.alk == null ? '-' : formatNumber(bath.alk, 0)}, Calcium ${bath.calcium == null ? '-' : formatNumber(bath.calcium, 0)}, Temp ${bath.temp == null ? '-' : formatNumber(bath.temp, 1)}, Phosphates ${bath.phosphates == null ? '-' : formatNumber(bath.phosphates, 0)}, Acid ${formatDose(bath.acid, 'mL', 0)}, Chlorine ${formatDose(bath.chlorine, 'mL', 0)}, Bicarb ${formatDose(bath.bicarb, 'kg', 2)}, Calcium dose ${formatDose(bath.calciumDose, 'kg', 2)}${bath.note ? `, Note: ${bath.note}` : ''}.`).join(' '),
+          baths.map((bath, idx) => {
+            const chemRows = buildIceBathChemicalRows(idx + 1, {
+              acid: bath.acid || 0,
+              chlorine: bath.chlorine || 0,
+              bicarb: bath.bicarb || 0,
+              calcium: bath.calciumDose || 0
+            });
+            const chemText = chemRows.map(row => `${row.label}: recommended ${formatDose(row.value, row.unit, row.decimals)}, dosed ${row.dosed}${row.source ? ` from ${row.source}` : ''}${row.actualQtyText ? `, actual ${row.actualQtyText}` : ''}${row.notes ? `, note ${row.notes}` : ''}`).join('; ');
+            return `${bath.poolName}: clarity ${bath.clarity || '-'}, pH ${bath.ph == null ? '-' : formatNumber(bath.ph, 2)}, FC ${bath.fc == null ? '-' : formatNumber(bath.fc, 2)}, TC ${bath.tc == null ? '-' : formatNumber(bath.tc, 2)}, Alk ${bath.alk == null ? '-' : formatNumber(bath.alk, 0)}, Calcium ${bath.calcium == null ? '-' : formatNumber(bath.calcium, 0)}, Temp ${bath.temp == null ? '-' : formatNumber(bath.temp, 1)}, Phosphates ${bath.phosphates == null ? '-' : formatNumber(bath.phosphates, 0)}. Chemical log: ${chemText}.${bath.note ? ` Note: ${bath.note}.` : ''}`;
+          }).join(' '),
           getContextTags().length ? `Service context: ${getContextTags().join('; ')}.` : ''
         ].filter(Boolean).join(' ');
         return {
@@ -3961,7 +4081,8 @@ function buildReportHtml() {
           index,
           ...detail.rec,
           rows: detail.rows,
-          doses: detail.doses
+          doses: detail.doses,
+          chemicalRows: buildIceBathChemicalRows(index, detail.doses)
         };
       });
       return {
@@ -4007,34 +4128,38 @@ function buildReportHtml() {
             <table class="report-table">
               <tbody>
                 <tr>
-                  <th style="width:18%;">Water clarity</th>
-                  <td style="width:32%;">${escapeHtml(bath.clarity)}</td>
+                  <th style="width:18%;">Ice bath</th>
+                  <td style="width:32%; font-weight:700;">${escapeHtml(bath.poolName)}</td>
                   <th style="width:18%;">Volume used for dosing</th>
                   <td style="width:32%;">6,000 L</td>
                 </tr>
                 <tr>
+                  <th>Water clarity</th>
+                  <td>${escapeHtml(bath.clarity)}</td>
                   <th>Current pH</th>
                   <td>${bath.ph == null ? '-' : formatNumber(bath.ph, 2)}</td>
+                </tr>
+                <tr>
                   <th>Free chlorine</th>
                   <td>${bath.fc == null ? '-' : formatNumber(bath.fc, 2)}</td>
-                </tr>
-                <tr>
                   <th>Total chlorine</th>
                   <td>${bath.tc == null ? '-' : formatNumber(bath.tc, 2)}</td>
+                </tr>
+                <tr>
                   <th>Alkalinity</th>
                   <td>${bath.alk == null ? '-' : formatNumber(bath.alk, 0)}</td>
-                </tr>
-                <tr>
                   <th>Calcium hardness</th>
                   <td>${bath.calcium == null ? '-' : formatNumber(bath.calcium, 0)}</td>
-                  <th>Temperature</th>
-                  <td>${bath.temp == null ? '-' : formatNumber(bath.temp, 1)}</td>
                 </tr>
                 <tr>
+                  <th>Temperature</th>
+                  <td>${bath.temp == null ? '-' : formatNumber(bath.temp, 1)}</td>
                   <th>Phosphates</th>
                   <td>${bath.phosphates == null ? '-' : formatNumber(bath.phosphates, 0)}</td>
+                </tr>
+                <tr>
                   <th>Note</th>
-                  <td>${escapeHtml(bath.note || '')}</td>
+                  <td colspan="3">${escapeHtml(bath.note || '')}</td>
                 </tr>
               </tbody>
             </table>
@@ -4051,6 +4176,23 @@ function buildReportHtml() {
                     <td>${escapeHtml(row.rangeLabel || '-')}</td>
                     <td>${escapeHtml(row.status.label)}</td>
                     <td>${escapeHtml(row.action)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+            <table class="report-table tight" style="margin-top:-4px;">
+              <thead>
+                <tr><th>Chemical used</th><th>Recommended dose</th><th>Dosed?</th><th>Stock source</th><th>Actual qty used</th><th>Notes</th></tr>
+              </thead>
+              <tbody>
+                ${bath.chemicalRows.map(row => `
+                  <tr>
+                    <td>${escapeHtml(row.label)}</td>
+                    <td>${formatDose(row.value, row.unit, row.decimals)}</td>
+                    <td>${escapeHtml(row.dosed)}</td>
+                    <td>${escapeHtml(row.source || '-')}</td>
+                    <td>${escapeHtml(row.actualQtyText || '-')}</td>
+                    <td>${escapeHtml(row.notes || '')}</td>
                   </tr>
                 `).join('')}
               </tbody>
@@ -4157,6 +4299,184 @@ async function savePdfReport() {
       renderReport();
       if (!window.jspdf || !window.jspdf.jsPDF) {
         alert('PDF library did not load. Please refresh and try again.');
+        return;
+      }
+
+      if (isRaidersGroupMode()) {
+        const model = buildRaidersGroupReportModel();
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = 10;
+        const blue = [0, 58, 117];
+        const borderBlue = [168, 191, 216];
+
+        const drawSectionBar = (title, yPos) => {
+          doc.setFillColor(...blue);
+          doc.roundedRect(margin, yPos, pageWidth - (margin * 2), 7.5, 2.2, 2.2, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10.5);
+          doc.setTextColor(255, 255, 255);
+          doc.text(title, margin + 3, yPos + 5);
+          doc.setTextColor(0, 0, 0);
+          return yPos + 8.5;
+        };
+
+        model.baths.forEach((bath, bathIndex) => {
+          if (bathIndex > 0) doc.addPage('a4', 'landscape');
+          doc.setDrawColor(...borderBlue);
+          doc.roundedRect(6, 6, pageWidth - 12, pageHeight - 12, 4, 4, 'S');
+
+          const metaW = 78;
+          const gap = 8;
+          const brandX = margin;
+          const brandY = 10;
+          const brandW = pageWidth - (margin * 2) - metaW - gap;
+          const brandH = 36;
+
+          doc.setDrawColor(...borderBlue);
+          doc.setFillColor(255, 255, 255);
+          doc.roundedRect(brandX, brandY, brandW, brandH, 3, 3, 'FD');
+
+          try {
+            doc.addImage(REPORT_LOGO_DATA, 'PNG', brandX + 4.5, brandY + 3.7, 58, 18.65);
+          } catch (error) {
+            console.warn('Report logo failed to load for grouped PDF', error);
+          }
+
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(...blue);
+          doc.setFontSize(9.4);
+          doc.text('MBS Facility Maintenance', brandX + brandW - 5, brandY + 7, { align: 'right' });
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(51, 65, 85);
+          doc.setFontSize(7.7);
+          ['63 Tennant Street', 'Fyshwick ACT 2609', '(02) 6162 0216', 'info@mbsfm.com.au'].forEach((line, idx) => {
+            doc.text(line, brandX + brandW - 5, brandY + 11.5 + (idx * 3.8), { align: 'right' });
+          });
+
+          doc.setFillColor(...blue);
+          doc.roundedRect(brandX, brandY + brandH - 12, brandW, 12, 0, 0, 'F');
+          doc.setTextColor(255, 255, 255);
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(14.5);
+          doc.text(`${model.title} - ${bath.poolName}`, brandX + 5, brandY + brandH - 4);
+          doc.setTextColor(0, 0, 0);
+
+          const cardX = brandX + brandW + gap;
+          const cardY = brandY;
+          const cardH = brandH;
+          doc.setDrawColor(...borderBlue);
+          doc.setFillColor(255, 255, 255);
+          doc.roundedRect(cardX, cardY, metaW, cardH, 3, 3, 'FD');
+          doc.setFillColor(...blue);
+          doc.roundedRect(cardX, cardY, metaW, 7, 3, 3, 'F');
+          doc.rect(cardX, cardY + 4, metaW, 3, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(7.6);
+          doc.setTextColor(255, 255, 255);
+          doc.text('TEST DETAILS', cardX + 4, cardY + 4.7);
+          const metaItems = [
+            ['Site', model.site, cardX + 4, cardY + 12],
+            ['Technician', model.technician, cardX + 41, cardY + 12],
+            ['Ice Bath', bath.poolName, cardX + 4, cardY + 22],
+            ['Date', model.date, cardX + 41, cardY + 22],
+            ['Test time', model.testTime, cardX + 4, cardY + 30.5]
+          ];
+          metaItems.forEach(([label, value, x, y]) => {
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...blue);
+            doc.setFontSize(6.6);
+            doc.text(label, x, y);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(17, 24, 39);
+            doc.setFontSize(7.7);
+            doc.text(doc.splitTextToSize(String(value || '-'), label === 'Ice Bath' ? 32 : 28), x, y + 3.2);
+          });
+          doc.setTextColor(0, 0, 0);
+
+          let y = 51;
+          y = drawSectionBar(bath.poolName, y);
+          y = drawTable(
+            doc,
+            margin,
+            y,
+            [38, 24, 30, 24, 28, 24, 28, 22, 22, pageWidth - (margin * 2) - 38 - 24 - 30 - 24 - 28 - 24 - 28 - 22 - 22],
+            ['Ice Bath', 'Water Clarity', 'Volume', 'pH', 'Free Cl', 'Total Cl', 'Alkalinity', 'Calcium', 'Temp', 'Phosphates'],
+            [[bath.poolName, bath.clarity || '-', '6,000 L', bath.ph == null ? '-' : formatNumber(bath.ph, 2), bath.fc == null ? '-' : formatNumber(bath.fc, 2), bath.tc == null ? '-' : formatNumber(bath.tc, 2), bath.alk == null ? '-' : formatNumber(bath.alk, 0), bath.calcium == null ? '-' : formatNumber(bath.calcium, 0), bath.temp == null ? '-' : formatNumber(bath.temp, 1), bath.phosphates == null ? '-' : formatNumber(bath.phosphates, 0)]],
+            { fontSize: 7.1, headerFontSize: 7.1, striped: false }
+          );
+
+          y += 4;
+          y = drawSectionBar('Water Test Results', y);
+          const resultRows = bath.rows.map(row => [
+            row.parameter,
+            row.current == null ? '-' : formatNumber(row.current, row.decimals),
+            row.target == null ? '-' : formatNumber(row.target, row.decimals),
+            row.rangeLabel || '-',
+            row.status.label,
+            row.action
+          ]);
+          y = drawTable(
+            doc,
+            margin,
+            y,
+            [34, 20, 20, 28, 18, pageWidth - (margin * 2) - 34 - 20 - 20 - 28 - 18],
+            ['Parameter', 'Current', 'Target', 'Normal range', 'Status', 'Recommended action / dose'],
+            resultRows,
+            { fontSize: 7.2, headerFontSize: 7.2, striped: true }
+          );
+
+          y += 4;
+          y = drawSectionBar('Chemical Log', y);
+          const chemicalRows = bath.chemicalRows.map(row => [
+            row.label,
+            formatDose(row.value, row.unit, row.decimals),
+            row.dosed,
+            row.source || '-',
+            row.actualQtyText || '-',
+            row.notes || ''
+          ]);
+          y = drawTable(
+            doc,
+            margin,
+            y,
+            [46, 28, 16, 24, 28, pageWidth - (margin * 2) - 46 - 28 - 16 - 24 - 28],
+            ['Chemical used', 'Recommended dose', 'Dosed?', 'Stock source', 'Actual qty used', 'Notes'],
+            chemicalRows,
+            { fontSize: 7.2, headerFontSize: 7.2, striped: true }
+          );
+
+          const notesY = y + 6;
+          doc.setDrawColor(...borderBlue);
+          doc.setFillColor(255, 255, 255);
+          doc.roundedRect(margin, notesY, pageWidth - (margin * 2), 22, 2.5, 2.5, 'FD');
+          doc.setFillColor(...blue);
+          doc.roundedRect(margin, notesY, pageWidth - (margin * 2), 7.5, 2.5, 2.5, 'F');
+          doc.rect(margin, notesY + 4.5, pageWidth - (margin * 2), 3, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(255, 255, 255);
+          doc.setFontSize(8.6);
+          doc.text('Technician notes', margin + 3, notesY + 5);
+          doc.setTextColor(31, 41, 55);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8.2);
+          const noteText = [bath.note || '', model.notes || ''].filter(Boolean).join(' ');
+          doc.text(doc.splitTextToSize(noteText || 'No extra technician notes.', pageWidth - (margin * 2) - 6), margin + 3, notesY + 12);
+
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(7.5);
+          doc.setTextColor(100, 116, 139);
+          doc.text(`Generated from the calculator   Page ${bathIndex + 1} of ${model.baths.length}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+          doc.setTextColor(0, 0, 0);
+        });
+
+        const filenameBase = (inputs.reportPoolName.value || 'water-quality-report').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        const filename = `${filenameBase || 'water-quality-report'}-${inputs.reportDate.value || 'report'}.pdf`;
+        await updateLiveMasterSheet(buildPoolSheetPayload());
+        const blob = doc.output('blob');
+        await saveBlob(blob, filename, 'application/pdf');
         return;
       }
 
@@ -4915,6 +5235,18 @@ async function savePdfReport() {
         if (sourceField) payload[`doseSource_${key}`] = sourceField.value;
         if (actualField) payload[`doseActual_${key}`] = actualField.value;
         if (noteField) payload[`doseNote_${key}`] = noteField.value;
+      });
+      [1, 2, 3].forEach(index => {
+        GROUP_ICE_DOSING_KEYS.forEach(key => {
+          const statusField = qs(`iceBath${index}DoseStatus_${key}`);
+          const sourceField = qs(`iceBath${index}DoseSource_${key}`);
+          const actualField = qs(`iceBath${index}DoseActual_${key}`);
+          const noteField = qs(`iceBath${index}DoseNote_${key}`);
+          if (statusField) payload[`iceBath${index}DoseStatus_${key}`] = statusField.value;
+          if (sourceField) payload[`iceBath${index}DoseSource_${key}`] = sourceField.value;
+          if (actualField) payload[`iceBath${index}DoseActual_${key}`] = actualField.value;
+          if (noteField) payload[`iceBath${index}DoseNote_${key}`] = noteField.value;
+        });
       });
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     }
