@@ -1210,6 +1210,7 @@
       </section>
 
 
+      
       <section class="card span-12 hidden" id="groupIceBathsCard">
         <h2>Raiders ice baths - all 3</h2>
         <div class="mode-note">Each ice bath is calculated separately at 6,000 L. Group view shown as 3 x 6,000 L = 18,000 L total.</div>
@@ -1217,15 +1218,7 @@
           <div class="subcard">
             <h3>Raiders Ice Bath 1</h3>
             <div class="inline-note" style="margin-bottom:10px;">Volume used for dosing: 6,000 L</div>
-            <div class="field-grid">
-              <div class="field"><label for="iceBath1Clarity">Water clarity</label><select id="iceBath1Clarity"><option value="">Select</option><option>Clear</option><option>Slightly cloudy</option><option>Cloudy</option><option>Poor</option></select></div>
-              <div class="field"><label for="iceBath1Ph">Current pH</label><input id="iceBath1Ph" type="number" step="0.01" inputmode="decimal" /></div>
-              <div class="field"><label for="iceBath1Fc">Free chlorine</label><input id="iceBath1Fc" type="number" step="0.01" inputmode="decimal" /></div>
-              <div class="field"><label for="iceBath1Alk">Alkalinity</label><input id="iceBath1Alk" type="number" step="1" inputmode="decimal" /></div>
-              <div class="field"><label for="iceBath1Temp">Temperature</label><input id="iceBath1Temp" type="number" step="0.1" inputmode="decimal" /></div>
-              <div class="field"><label for="iceBath1Note">Note</label><input id="iceBath1Note" type="text" placeholder="Optional" /></div>
-            </div>
-            <div class="button-row" style="margin: 10px 0 8px; flex-wrap: wrap;">
+            <div class="button-row" style="margin: 6px 0 8px; flex-wrap: wrap;">
               <label class="button secondary" for="iceBath1PhotoInput" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">Add photo</label>
               <button class="button secondary" type="button" id="scanIceBath1PhotoBtn">Read photo</button>
               <button class="button ghost" type="button" id="clearIceBath1PhotoBtn">Clear photo</button>
@@ -1234,21 +1227,24 @@
             <div class="preview-box" id="iceBath1PhotoPreviewBox" style="min-height:160px;">
               <div class="placeholder">No photo attached for Ice Bath 1.</div>
             </div>
-            <div class="photo-note" id="iceBath1PhotoOcrStatus" style="margin-top: 8px; font-size: 12px;">Add a Spin Touch photo for Ice Bath 1 and the app will try to fill pH, free chlorine, alkalinity and temperature.</div>
+            <div class="photo-note" id="iceBath1PhotoOcrStatus" style="margin-top: 8px; font-size: 12px;">Add a Spin Touch photo for Ice Bath 1 and the app will try to fill pH, free chlorine, alkalinity, calcium hardness, temperature and phosphates.</div>
+            <div class="field-grid" style="margin-top: 12px;">
+              <div class="field"><label for="iceBath1Clarity">Water clarity</label><select id="iceBath1Clarity"><option value="">Select</option><option>Clear</option><option>Slightly cloudy</option><option>Cloudy</option><option>Poor</option></select></div>
+              <div class="field"><label for="iceBath1Ph">Current pH</label><input id="iceBath1Ph" type="number" step="0.01" inputmode="decimal" /></div>
+              <div class="field"><label for="iceBath1Fc">Free chlorine</label><input id="iceBath1Fc" type="number" step="0.01" inputmode="decimal" /></div>
+              <div class="field"><label for="iceBath1Tc">Total chlorine</label><input id="iceBath1Tc" type="number" step="0.01" inputmode="decimal" /></div>
+              <div class="field"><label for="iceBath1Alk">Alkalinity</label><input id="iceBath1Alk" type="number" step="1" inputmode="decimal" /></div>
+              <div class="field"><label for="iceBath1Calcium">Calcium hardness</label><input id="iceBath1Calcium" type="number" step="1" inputmode="decimal" /></div>
+              <div class="field"><label for="iceBath1Temp">Temperature</label><input id="iceBath1Temp" type="number" step="0.1" inputmode="decimal" /></div>
+              <div class="field"><label for="iceBath1Phosphates">Phosphates</label><input id="iceBath1Phosphates" type="number" step="1" inputmode="decimal" /></div>
+              <div class="field"><label for="iceBath1Note">Note</label><input id="iceBath1Note" type="text" placeholder="Optional" /></div>
+            </div>
             <div class="mini-summary" id="iceBath1Summary"></div>
           </div>
           <div class="subcard">
             <h3>Raiders Ice Bath 2</h3>
             <div class="inline-note" style="margin-bottom:10px;">Volume used for dosing: 6,000 L</div>
-            <div class="field-grid">
-              <div class="field"><label for="iceBath2Clarity">Water clarity</label><select id="iceBath2Clarity"><option value="">Select</option><option>Clear</option><option>Slightly cloudy</option><option>Cloudy</option><option>Poor</option></select></div>
-              <div class="field"><label for="iceBath2Ph">Current pH</label><input id="iceBath2Ph" type="number" step="0.01" inputmode="decimal" /></div>
-              <div class="field"><label for="iceBath2Fc">Free chlorine</label><input id="iceBath2Fc" type="number" step="0.01" inputmode="decimal" /></div>
-              <div class="field"><label for="iceBath2Alk">Alkalinity</label><input id="iceBath2Alk" type="number" step="1" inputmode="decimal" /></div>
-              <div class="field"><label for="iceBath2Temp">Temperature</label><input id="iceBath2Temp" type="number" step="0.1" inputmode="decimal" /></div>
-              <div class="field"><label for="iceBath2Note">Note</label><input id="iceBath2Note" type="text" placeholder="Optional" /></div>
-            </div>
-            <div class="button-row" style="margin: 10px 0 8px; flex-wrap: wrap;">
+            <div class="button-row" style="margin: 6px 0 8px; flex-wrap: wrap;">
               <label class="button secondary" for="iceBath2PhotoInput" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">Add photo</label>
               <button class="button secondary" type="button" id="scanIceBath2PhotoBtn">Read photo</button>
               <button class="button ghost" type="button" id="clearIceBath2PhotoBtn">Clear photo</button>
@@ -1257,21 +1253,24 @@
             <div class="preview-box" id="iceBath2PhotoPreviewBox" style="min-height:160px;">
               <div class="placeholder">No photo attached for Ice Bath 2.</div>
             </div>
-            <div class="photo-note" id="iceBath2PhotoOcrStatus" style="margin-top: 8px; font-size: 12px;">Add a Spin Touch photo for Ice Bath 2 and the app will try to fill pH, free chlorine, alkalinity and temperature.</div>
+            <div class="photo-note" id="iceBath2PhotoOcrStatus" style="margin-top: 8px; font-size: 12px;">Add a Spin Touch photo for Ice Bath 2 and the app will try to fill pH, free chlorine, alkalinity, calcium hardness, temperature and phosphates.</div>
+            <div class="field-grid" style="margin-top: 12px;">
+              <div class="field"><label for="iceBath2Clarity">Water clarity</label><select id="iceBath2Clarity"><option value="">Select</option><option>Clear</option><option>Slightly cloudy</option><option>Cloudy</option><option>Poor</option></select></div>
+              <div class="field"><label for="iceBath2Ph">Current pH</label><input id="iceBath2Ph" type="number" step="0.01" inputmode="decimal" /></div>
+              <div class="field"><label for="iceBath2Fc">Free chlorine</label><input id="iceBath2Fc" type="number" step="0.01" inputmode="decimal" /></div>
+              <div class="field"><label for="iceBath2Tc">Total chlorine</label><input id="iceBath2Tc" type="number" step="0.01" inputmode="decimal" /></div>
+              <div class="field"><label for="iceBath2Alk">Alkalinity</label><input id="iceBath2Alk" type="number" step="1" inputmode="decimal" /></div>
+              <div class="field"><label for="iceBath2Calcium">Calcium hardness</label><input id="iceBath2Calcium" type="number" step="1" inputmode="decimal" /></div>
+              <div class="field"><label for="iceBath2Temp">Temperature</label><input id="iceBath2Temp" type="number" step="0.1" inputmode="decimal" /></div>
+              <div class="field"><label for="iceBath2Phosphates">Phosphates</label><input id="iceBath2Phosphates" type="number" step="1" inputmode="decimal" /></div>
+              <div class="field"><label for="iceBath2Note">Note</label><input id="iceBath2Note" type="text" placeholder="Optional" /></div>
+            </div>
             <div class="mini-summary" id="iceBath2Summary"></div>
           </div>
           <div class="subcard">
             <h3>Raiders Ice Bath 3</h3>
             <div class="inline-note" style="margin-bottom:10px;">Volume used for dosing: 6,000 L</div>
-            <div class="field-grid">
-              <div class="field"><label for="iceBath3Clarity">Water clarity</label><select id="iceBath3Clarity"><option value="">Select</option><option>Clear</option><option>Slightly cloudy</option><option>Cloudy</option><option>Poor</option></select></div>
-              <div class="field"><label for="iceBath3Ph">Current pH</label><input id="iceBath3Ph" type="number" step="0.01" inputmode="decimal" /></div>
-              <div class="field"><label for="iceBath3Fc">Free chlorine</label><input id="iceBath3Fc" type="number" step="0.01" inputmode="decimal" /></div>
-              <div class="field"><label for="iceBath3Alk">Alkalinity</label><input id="iceBath3Alk" type="number" step="1" inputmode="decimal" /></div>
-              <div class="field"><label for="iceBath3Temp">Temperature</label><input id="iceBath3Temp" type="number" step="0.1" inputmode="decimal" /></div>
-              <div class="field"><label for="iceBath3Note">Note</label><input id="iceBath3Note" type="text" placeholder="Optional" /></div>
-            </div>
-            <div class="button-row" style="margin: 10px 0 8px; flex-wrap: wrap;">
+            <div class="button-row" style="margin: 6px 0 8px; flex-wrap: wrap;">
               <label class="button secondary" for="iceBath3PhotoInput" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">Add photo</label>
               <button class="button secondary" type="button" id="scanIceBath3PhotoBtn">Read photo</button>
               <button class="button ghost" type="button" id="clearIceBath3PhotoBtn">Clear photo</button>
@@ -1280,11 +1279,23 @@
             <div class="preview-box" id="iceBath3PhotoPreviewBox" style="min-height:160px;">
               <div class="placeholder">No photo attached for Ice Bath 3.</div>
             </div>
-            <div class="photo-note" id="iceBath3PhotoOcrStatus" style="margin-top: 8px; font-size: 12px;">Add a Spin Touch photo for Ice Bath 3 and the app will try to fill pH, free chlorine, alkalinity and temperature.</div>
+            <div class="photo-note" id="iceBath3PhotoOcrStatus" style="margin-top: 8px; font-size: 12px;">Add a Spin Touch photo for Ice Bath 3 and the app will try to fill pH, free chlorine, alkalinity, calcium hardness, temperature and phosphates.</div>
+            <div class="field-grid" style="margin-top: 12px;">
+              <div class="field"><label for="iceBath3Clarity">Water clarity</label><select id="iceBath3Clarity"><option value="">Select</option><option>Clear</option><option>Slightly cloudy</option><option>Cloudy</option><option>Poor</option></select></div>
+              <div class="field"><label for="iceBath3Ph">Current pH</label><input id="iceBath3Ph" type="number" step="0.01" inputmode="decimal" /></div>
+              <div class="field"><label for="iceBath3Fc">Free chlorine</label><input id="iceBath3Fc" type="number" step="0.01" inputmode="decimal" /></div>
+              <div class="field"><label for="iceBath3Tc">Total chlorine</label><input id="iceBath3Tc" type="number" step="0.01" inputmode="decimal" /></div>
+              <div class="field"><label for="iceBath3Alk">Alkalinity</label><input id="iceBath3Alk" type="number" step="1" inputmode="decimal" /></div>
+              <div class="field"><label for="iceBath3Calcium">Calcium hardness</label><input id="iceBath3Calcium" type="number" step="1" inputmode="decimal" /></div>
+              <div class="field"><label for="iceBath3Temp">Temperature</label><input id="iceBath3Temp" type="number" step="0.1" inputmode="decimal" /></div>
+              <div class="field"><label for="iceBath3Phosphates">Phosphates</label><input id="iceBath3Phosphates" type="number" step="1" inputmode="decimal" /></div>
+              <div class="field"><label for="iceBath3Note">Note</label><input id="iceBath3Note" type="text" placeholder="Optional" /></div>
+            </div>
             <div class="mini-summary" id="iceBath3Summary"></div>
           </div>
         </div>
       </section>
+</section>
 
       <section class="card span-12" id="singleCombinedCard">
         <h2>Combined water balance and dosing</h2>
@@ -1889,8 +1900,11 @@
         clarity: (inputs[`iceBath${index}Clarity`] && inputs[`iceBath${index}Clarity`].value) || '',
         ph: n(inputs[`iceBath${index}Ph`] && inputs[`iceBath${index}Ph`].value),
         fc: n(inputs[`iceBath${index}Fc`] && inputs[`iceBath${index}Fc`].value),
+        tc: n(inputs[`iceBath${index}Tc`] && inputs[`iceBath${index}Tc`].value),
         alk: n(inputs[`iceBath${index}Alk`] && inputs[`iceBath${index}Alk`].value),
+        calcium: n(inputs[`iceBath${index}Calcium`] && inputs[`iceBath${index}Calcium`].value),
         temp: n(inputs[`iceBath${index}Temp`] && inputs[`iceBath${index}Temp`].value),
+        phosphates: n(inputs[`iceBath${index}Phosphates`] && inputs[`iceBath${index}Phosphates`].value),
         note: (inputs[`iceBath${index}Note`] && inputs[`iceBath${index}Note`].value) || ''
       };
     }
@@ -1904,8 +1918,11 @@
         clarity: values.clarity || '-',
         ph: values.ph,
         fc: values.fc,
+        tc: values.tc,
         alk: values.alk,
+        calcium: values.calcium,
         temp: values.temp,
+        phosphates: values.phosphates,
         note: values.note,
         targetPh: defaults.ph,
         targetFc: defaults.fc,
@@ -1946,7 +1963,9 @@
           <div class="mini-pill"><strong>Chlorine</strong>${formatDose(rec.chlorine, 'mL', 0)}</div>
           <div class="mini-pill"><strong>Bicarb</strong>${formatDose(rec.bicarb, 'kg', 2)}</div>
           <div class="mini-pill"><strong>Targets</strong>pH ${formatNumber(rec.targetPh, 2)} | FC ${formatNumber(rec.targetFc, 2)} | Alk ${formatNumber(rec.targetAlk, 0)}</div>
-          <div class="mini-pill"><strong>Reading</strong>pH ${rec.ph == null ? '-' : formatNumber(rec.ph, 2)} | FC ${rec.fc == null ? '-' : formatNumber(rec.fc, 2)} | Alk ${rec.alk == null ? '-' : formatNumber(rec.alk, 0)}</div>
+          <div class="mini-pill"><strong>Core reading</strong>pH ${rec.ph == null ? '-' : formatNumber(rec.ph, 2)} | FC ${rec.fc == null ? '-' : formatNumber(rec.fc, 2)} | TC ${rec.tc == null ? '-' : formatNumber(rec.tc, 2)}</div>
+          <div class="mini-pill"><strong>Extra reading</strong>Alk ${rec.alk == null ? '-' : formatNumber(rec.alk, 0)} | Cal ${rec.calcium == null ? '-' : formatNumber(rec.calcium, 0)} | Temp ${rec.temp == null ? '-' : formatNumber(rec.temp, 1)}</div>
+          <div class="mini-pill"><strong>Phosphates</strong>${rec.phosphates == null ? '-' : formatNumber(rec.phosphates, 0)}</div>
         `;
       });
     }
@@ -2369,7 +2388,7 @@
         const notes = [
           'Each ice bath is calculated separately at 6,000 L.',
           (inputs.serviceNotes.value || '').trim(),
-          baths.map(bath => `${bath.poolName}: clarity ${bath.clarity || '-'}, pH ${bath.ph == null ? '-' : formatNumber(bath.ph, 2)}, FC ${bath.fc == null ? '-' : formatNumber(bath.fc, 2)}, Alk ${bath.alk == null ? '-' : formatNumber(bath.alk, 0)}, Acid ${formatDose(bath.acid, 'mL', 0)}, Chlorine ${formatDose(bath.chlorine, 'mL', 0)}, Bicarb ${formatDose(bath.bicarb, 'kg', 2)}${bath.note ? `, Note: ${bath.note}` : ''}.`).join(' '),
+          baths.map(bath => `${bath.poolName}: clarity ${bath.clarity || '-'}, pH ${bath.ph == null ? '-' : formatNumber(bath.ph, 2)}, FC ${bath.fc == null ? '-' : formatNumber(bath.fc, 2)}, TC ${bath.tc == null ? '-' : formatNumber(bath.tc, 2)}, Alk ${bath.alk == null ? '-' : formatNumber(bath.alk, 0)}, Calcium ${bath.calcium == null ? '-' : formatNumber(bath.calcium, 0)}, Temp ${bath.temp == null ? '-' : formatNumber(bath.temp, 1)}, Phosphates ${bath.phosphates == null ? '-' : formatNumber(bath.phosphates, 0)}, Acid ${formatDose(bath.acid, 'mL', 0)}, Chlorine ${formatDose(bath.chlorine, 'mL', 0)}, Bicarb ${formatDose(bath.bicarb, 'kg', 2)}${bath.note ? `, Note: ${bath.note}` : ''}.`).join(' '),
           getContextTags().length ? `Service context: ${getContextTags().join('; ')}.` : ''
         ].filter(Boolean).join(' ');
         return {
@@ -3767,8 +3786,8 @@ function buildReportHtml() {
             </div>
           </div>
           <div class="report-section-bar">Ice bath results</div>
-          <table class="report-table">
-            <thead><tr><th>Bath</th><th>Clarity</th><th>pH</th><th>FC</th><th>Alk</th><th>Temp</th><th>Acid</th><th>Chlorine</th><th>Bicarb</th><th>Note</th></tr></thead>
+          <table class="report-table tight">
+            <thead><tr><th>Bath</th><th>Clarity</th><th>pH</th><th>FC</th><th>TC</th><th>Alk</th><th>Calcium</th><th>Temp</th><th>Phos</th><th>Acid</th><th>Chlorine</th><th>Bicarb</th><th>Note</th></tr></thead>
             <tbody>
               ${model.baths.map(bath => `
                 <tr>
@@ -3776,8 +3795,11 @@ function buildReportHtml() {
                   <td>${escapeHtml(bath.clarity)}</td>
                   <td>${bath.ph == null ? '-' : formatNumber(bath.ph, 2)}</td>
                   <td>${bath.fc == null ? '-' : formatNumber(bath.fc, 2)}</td>
+                  <td>${bath.tc == null ? '-' : formatNumber(bath.tc, 2)}</td>
                   <td>${bath.alk == null ? '-' : formatNumber(bath.alk, 0)}</td>
+                  <td>${bath.calcium == null ? '-' : formatNumber(bath.calcium, 0)}</td>
                   <td>${bath.temp == null ? '-' : formatNumber(bath.temp, 1)}</td>
+                  <td>${bath.phosphates == null ? '-' : formatNumber(bath.phosphates, 0)}</td>
                   <td>${formatDose(bath.acid, 'mL', 0)}</td>
                   <td>${formatDose(bath.chlorine, 'mL', 0)}</td>
                   <td>${formatDose(bath.bicarb, 'kg', 2)}</td>
@@ -4471,7 +4493,9 @@ async function savePdfReport() {
         freeChlorine: `iceBath${index}Fc`,
         ph: `iceBath${index}Ph`,
         alkalinity: `iceBath${index}Alk`,
-        temperature: `iceBath${index}Temp`
+        calciumHardness: `iceBath${index}Calcium`,
+        temperature: `iceBath${index}Temp`,
+        phosphates: `iceBath${index}Phosphates`
       };
 
       let populated = 0;
@@ -4592,7 +4616,9 @@ async function savePdfReport() {
           if (results.freeChlorine != null) fields.push('free chlorine');
           if (results.ph != null) fields.push('pH');
           if (results.alkalinity != null) fields.push('alkalinity');
+          if (results.calciumHardness != null) fields.push('calcium hardness');
           if (results.temperature != null) fields.push('temperature');
+          if (results.phosphates != null) fields.push('phosphates');
           setIceBathPhotoStatus(index, `Photo read complete. Filled Ice Bath ${index}: ${fields.join(', ')}.`, 'success');
         } else {
           setIceBathPhotoStatus(index, `The photo was loaded, but no clear Spin Touch results were found for Ice Bath ${index}. Try a clearer, straighter photo of just the Spin Touch screen.`, 'error');
@@ -4623,7 +4649,7 @@ async function savePdfReport() {
       const preview = qs(`iceBath${index}PhotoPreviewBox`);
       if (input) input.value = '';
       if (preview) preview.innerHTML = `<div class="placeholder">No photo attached for Ice Bath ${index}.</div>`;
-      setIceBathPhotoStatus(index, `Add a Spin Touch photo for Ice Bath ${index} and the app will try to fill pH, free chlorine, alkalinity and temperature.`);
+      setIceBathPhotoStatus(index, `Add a Spin Touch photo for Ice Bath ${index} and the app will try to fill pH, free chlorine, alkalinity, calcium hardness, temperature and phosphates.`);
     }
 
     function saveState() {
@@ -4728,9 +4754,9 @@ async function savePdfReport() {
         'closedSite', 'closedSystemName', 'closedTechnician', 'closedDate', 'closedTime', 'closedVisitInterval', 'closedNotes',
         'hhwTds', 'hhwTdsMin', 'hhwTdsMax', 'hhwPh', 'hhwPhMin', 'hhwPhMax', 'hhwInhibitor', 'hhwInhibitorMin', 'hhwInhibitorMax',
         'chwTds', 'chwTdsMin', 'chwTdsMax', 'chwPh', 'chwPhMin', 'chwPhMax', 'chwInhibitor', 'chwInhibitorMin', 'chwInhibitorMax',
-        'iceBath1Clarity', 'iceBath1Ph', 'iceBath1Fc', 'iceBath1Alk', 'iceBath1Temp', 'iceBath1Note',
-        'iceBath2Clarity', 'iceBath2Ph', 'iceBath2Fc', 'iceBath2Alk', 'iceBath2Temp', 'iceBath2Note',
-        'iceBath3Clarity', 'iceBath3Ph', 'iceBath3Fc', 'iceBath3Alk', 'iceBath3Temp', 'iceBath3Note',
+        'iceBath1Clarity', 'iceBath1Ph', 'iceBath1Fc', 'iceBath1Tc', 'iceBath1Alk', 'iceBath1Calcium', 'iceBath1Temp', 'iceBath1Phosphates', 'iceBath1Note',
+        'iceBath2Clarity', 'iceBath2Ph', 'iceBath2Fc', 'iceBath2Tc', 'iceBath2Alk', 'iceBath2Calcium', 'iceBath2Temp', 'iceBath2Phosphates', 'iceBath2Note',
+        'iceBath3Clarity', 'iceBath3Ph', 'iceBath3Fc', 'iceBath3Tc', 'iceBath3Alk', 'iceBath3Calcium', 'iceBath3Temp', 'iceBath3Phosphates', 'iceBath3Note',
         'googleScriptUrl'
       ].forEach(id => {
         inputs[id] = qs(id);
