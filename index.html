@@ -1490,38 +1490,14 @@
             <div class="unit">overall status</div>
           </div>
           <div class="kpi">
-            <div class="name">Dose items</div>
-            <div class="value" id="kpiDoseCount">0</div>
-            <div class="unit">chemicals recommended</div>
-          </div>
-          <div class="kpi">
             <div class="name">Report state</div>
             <div class="value" id="kpiReport">Draft</div>
             <div class="unit">updates live</div>
           </div>
         </div>
 
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Parameter</th>
-                <th>Current</th>
-                <th>Target</th>
-                <th>Normal range</th>
-                <th>Status</th>
-                <th>Recommended action / dose</th>
-              </tr>
-            </thead>
-            <tbody id="combinedTableBody"></tbody>
-          </table>
-        </div>
-
-        <div class="hint" style="margin-top: 12px;">
-          This combines the water balance check and dosing into one section, and now shows the acceptable range as well as the ideal target.
-        </div>
-
-        <div class="dose-checklist" id="doseChecklist"></div>
+        <div class="icebath-combined-cards" id="singleDoseCards"></div>
+        <div class="icebath-reference-grid" id="singleReferenceGrid"></div>
       </section>
 
 
@@ -2455,7 +2431,8 @@
         if (labels.includes('Low')) hasAdjust = true;
       });
       qs('kpiBalance').textContent = hasAction ? 'Attention' : hasAdjust ? 'Adjust' : 'Balanced';
-      qs('kpiDoseCount').textContent = String(totalDoseCount);
+      const doseCountEl = qs('kpiDoseCount');
+      if (doseCountEl) doseCountEl.textContent = String(totalDoseCount);
       qs('kpiReport').textContent = 'Live';
     }
 
@@ -3864,92 +3841,80 @@
         return;
       }
       const { rows, doses, volume } = buildRecommendationRows();
-      const tbody = qs('combinedTableBody');
-      tbody.innerHTML = '';
+      const currentDoseFields = getCurrentDoseFieldValues();
+      const doseCards = qs('singleDoseCards');
+      const referenceGrid = qs('singleReferenceGrid');
+      const resultByParameter = Object.fromEntries(rows.map(row => [row.parameter, row]));
+      const combinedRows = [
+        { result: resultByParameter['pH'], chemical: { key: 'acid', label: chemicalNames.acid, value: doses.acid || 0, unit: 'mL', decimals: 0 } },
+        { result: resultByParameter['Free chlorine'], chemical: { key: 'chlorine', label: chemicalNames.chlorine, value: doses.chlorine || 0, unit: 'mL', decimals: 0 } },
+        { result: resultByParameter['Alkalinity'], chemical: { key: 'bicarb', label: chemicalNames.bicarb, value: doses.bicarb || 0, unit: 'kg', decimals: 2 } },
+        { result: resultByParameter['Calcium hardness'], chemical: { key: 'calcium', label: chemicalNames.calcium, value: doses.calcium || 0, unit: 'kg', decimals: 2 } },
+        { result: resultByParameter['CYA'], chemical: { key: 'stabiliser', label: chemicalNames.stabiliser, value: doses.stabiliser || 0, unit: 'kg', decimals: 2 } },
+        { result: resultByParameter['Salt'], chemical: { key: 'salt', label: chemicalNames.salt, value: doses.salt || 0, unit: 'kg', decimals: 2 } }
+      ].filter(item => item.result && item.chemical);
+      const visibleDoseRows = combinedRows.filter(item => Number.isFinite(item.chemical.value) && item.chemical.value > 0);
 
-      rows.forEach(row => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td><strong>${row.parameter}</strong></td>
-          <td>${row.current == null ? '-' : formatNumber(row.current, row.decimals)}</td>
-          <td>${row.target == null ? '-' : formatNumber(row.target, row.decimals)}</td>
-          <td>${row.rangeLabel || '-'}</td>
-          <td><span class="${row.status.className}">${row.status.label}</span></td>
-          <td>${row.action}</td>
-        `;
-        tbody.appendChild(tr);
-      });
+      if (doseCards) {
+        doseCards.innerHTML = visibleDoseRows.length
+          ? visibleDoseRows.map(item => `
+            <div class="icebath-compact-card">
+              <div class="icebath-compact-top">
+                <div class="icebath-compact-title">${escapeHtml(item.chemical.label)}</div>
+                <div class="icebath-compact-dose">${formatDose(item.chemical.value, item.chemical.unit, item.chemical.decimals)}</div>
+              </div>
+              <div class="icebath-compact-facts">
+                <strong>${escapeHtml(item.result.status.label)}</strong> • ${item.result.current == null ? '-' : formatNumber(item.result.current, item.result.decimals)} → ${item.result.target == null ? '-' : formatNumber(item.result.target, item.result.decimals)} • ${escapeHtml(item.result.rangeLabel || '-')}
+              </div>
+              <div class="icebath-compact-controls">
+                <div class="field">
+                  <label for="doseStatus_${item.chemical.key}">Dosed</label>
+                  <select id="doseStatus_${item.chemical.key}">
+                    <option value="No">No</option>
+                    <option value="Yes">Yes</option>
+                  </select>
+                </div>
+                <div class="field icebath-dose-extra" id="doseSourceWrap_${item.chemical.key}">
+                  <label for="doseSource_${item.chemical.key}">Source</label>
+                  <select id="doseSource_${item.chemical.key}">
+                    <option value="">Select</option>
+                    <option value="ute">Ute stock</option>
+                    <option value="onsite">Onsite</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          `).join('')
+          : `<div class="icebath-reference-card"><strong>No chemical dosing required</strong><div class="icebath-reference-value">All automatic dose items are currently within range.</div></div>`;
+      }
+
+      if (referenceGrid) {
+        referenceGrid.innerHTML = rows.map(row => `
+          <div class="icebath-reference-card">
+            <strong>${escapeHtml(row.parameter)}</strong>
+            <div class="icebath-reference-value">${row.current == null ? '-' : formatNumber(row.current, row.decimals)}</div>
+            <div class="subtle">${escapeHtml(row.status.label)} • ${escapeHtml(row.rangeLabel || '-')}</div>
+          </div>
+        `).join('');
+      }
 
       const statuses = rows.map(row => row.status.label);
       const hasBad = statuses.includes('High');
       const hasWarn = statuses.includes('Low');
       const balanceLabel = hasBad ? 'Attention' : hasWarn ? 'Adjust' : 'Balanced';
-      const doseCount = Object.values(doses).filter(value => Number.isFinite(value) && value > 0).length;
 
       qs('kpiVolume').textContent = formatNumber(volume, 0);
       const volumeUnit = qs('kpiVolume') && qs('kpiVolume').nextElementSibling;
       if (volumeUnit) volumeUnit.textContent = 'litres';
       qs('kpiBalance').textContent = balanceLabel;
-      qs('kpiDoseCount').textContent = String(doseCount);
       qs('kpiReport').textContent = 'Live';
-
-      renderDoseChecklist(doses);
-    }
-
-    function renderDoseChecklist(doses) {
-      const checklist = qs('doseChecklist');
-      const currentDoseFields = getCurrentDoseFieldValues();
-      const doseConfig = [
-        { key: 'acid', unit: 'mL', decimals: 0, note: 'Acid estimate is based on pH and alkalinity. Retest after dosing.' },
-        { key: 'chlorine', unit: 'mL', decimals: 0, note: 'Based on liquid chlorine 12.5%.' },
-        { key: 'bicarb', unit: 'kg', decimals: 2, note: 'Dose in portions if the adjustment is large.' },
-        { key: 'calcium', unit: 'kg', decimals: 2, note: 'Pre-dissolve if required by your normal procedure.' },
-        { key: 'stabiliser', unit: 'kg', decimals: 2, note: 'Add by your normal stabiliser method if needed.' },
-        { key: 'salt', unit: 'kg', decimals: 2, note: 'Brush to help dissolve if needed.' }
-      ];
-
-      checklist.innerHTML = '';
-      doseConfig.forEach(item => {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'dose-row';
-        const amount = doses[item.key] || 0;
-        wrapper.innerHTML = `
-          <div class="dose-row-top">
-            <div class="dose-row-name">${chemicalNames[item.key]}</div>
-            <div class="dose-row-amount">${formatDose(amount, item.unit, item.decimals)}</div>
-          </div>
-          <div class="dose-row-grid">
-            <div class="field">
-              <label for="doseStatus_${item.key}">Dosed</label>
-              <select id="doseStatus_${item.key}">
-                <option value="No">No</option>
-                <option value="Yes">Yes</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="doseSource_${item.key}">Stock source</label>
-              <select id="doseSource_${item.key}">
-                <option value="">Select</option>
-                <option value="ute">Ute stock</option>
-                <option value="onsite">Stock onsite</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="doseActual_${item.key}">Actual qty used</label>
-              <input id="doseActual_${item.key}" type="number" step="any" inputmode="decimal" placeholder="Optional override" />
-            </div>
-            <div class="field">
-              <label for="doseNote_${item.key}">Dose note</label>
-              <input id="doseNote_${item.key}" type="text" placeholder="Optional note" />
-            </div>
-          </div>
-          <div class="subtle">${item.note}</div>
-        `;
-        checklist.appendChild(wrapper);
-      });
 
       restoreDoseFields(currentDoseFields);
       bindDoseFields();
+    }
+
+    function renderDoseChecklist() {
+      return;
     }
 
     function getCurrentDoseFieldValues() {
@@ -3971,24 +3936,37 @@
       saveState();
     }
 
+    function updateSingleDoseVisibility(key) {
+      const statusField = qs(`doseStatus_${key}`);
+      const sourceWrap = qs(`doseSourceWrap_${key}`);
+      if (!statusField || !sourceWrap) return;
+      sourceWrap.classList.toggle('hidden', statusField.value !== 'Yes');
+    }
+
     function bindDoseFields() {
       DOSE_KEYS.forEach(key => {
         const statusField = qs(`doseStatus_${key}`);
         const sourceField = qs(`doseSource_${key}`);
         const actualField = qs(`doseActual_${key}`);
         const noteField = qs(`doseNote_${key}`);
-        [statusField, sourceField].forEach(field => {
-          if (field && !field.dataset.bound) {
-            field.addEventListener('change', handleDoseFieldChange);
-            field.dataset.bound = 'true';
-          }
-        });
+        if (statusField && !statusField.dataset.bound) {
+          statusField.addEventListener('change', () => {
+            updateSingleDoseVisibility(key);
+            handleDoseFieldChange();
+          });
+          statusField.dataset.bound = 'true';
+        }
+        if (sourceField && !sourceField.dataset.bound) {
+          sourceField.addEventListener('change', handleDoseFieldChange);
+          sourceField.dataset.bound = 'true';
+        }
         [actualField, noteField].forEach(field => {
           if (field && !field.dataset.bound) {
             field.addEventListener('input', handleDoseFieldChange);
             field.dataset.bound = 'true';
           }
         });
+        updateSingleDoseVisibility(key);
       });
     }
 
