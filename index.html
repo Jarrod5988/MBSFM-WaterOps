@@ -1322,7 +1322,7 @@
           <button class="button ghost" id="saveVisitSnapshotBtn" type="button">Save visit snapshot</button>
         </div>
         <div class="report-output" id="reportOutput">Tap Generate report to build the service report.</div>
-        <div class="footer-note">PDF export is set to landscape.</div>
+        <div class="footer-note">PDF export is set to landscape. If the master sheet URL is saved in QR & setup, this button also updates the live log sheet.</div>
       </section>
     </div>
   </div>
@@ -1425,7 +1425,7 @@
           <button class="button ghost" id="saveClosedSnapshotBtn" type="button">Save closed loop snapshot</button>
         </div>
         <div class="report-output" id="closedReportOutput">Tap Generate report to build the closed loop report.</div>
-        <div class="footer-note">PDF export is set to landscape.</div>
+        <div class="footer-note">PDF export is set to landscape. If the master sheet URL is saved in QR & setup, this button also updates the live log sheet.</div>
       </section>
     </div>
   </div>
@@ -1533,6 +1533,22 @@
       </section>
 
       <section class="card span-12">
+        <h2>Google Sheets live log</h2>
+        <div class="field-grid" style="margin-bottom: 12px;">
+          <div class="field">
+            <label for="googleScriptUrl">Google Apps Script Web App URL</label>
+            <input id="googleScriptUrl" type="url" placeholder="Paste your deployed /exec URL" />
+            <small>Use the deployed Apps Script web app URL ending in <strong>/exec</strong>. When this is set, Generate and save PDF also sends the visit to the live master sheet.</small>
+          </div>
+        </div>
+        <div class="actions" style="margin-bottom: 12px;">
+          <button class="button secondary" id="saveGoogleScriptUrlBtn" type="button">Save sheet URL</button>
+          <button class="button ghost" id="openScriptTestBtn" type="button">Open script test</button>
+        </div>
+        <div class="hint" id="sheetStatusBox">No master sheet URL saved yet.</div>
+      </section>
+
+      <section class="card span-12">
         <h2>Local data tools</h2>
         <div class="actions" style="margin-bottom: 12px;">
           <button class="button secondary" id="exportDataBtn" type="button">Export local data</button>
@@ -1560,6 +1576,8 @@
     const ASSET_STORAGE_KEY = 'mbs-asset-registry-v1';
     const CLOSED_LOOP_HISTORY_KEY = 'mbs-closed-loop-history-v1';
     const ACTIVE_SCREEN_STORAGE_KEY = 'mbs-active-screen-v1';
+    const GOOGLE_SCRIPT_URL_STORAGE_KEY = 'mbs-google-script-url-v1';
+    const SHEET_STATUS_STORAGE_KEY = 'mbs-sheet-status-v1';
     let activeScreen = 'pools';
 
     // Updated list of pools including Raiders Ice Baths 2 & 3, Kamy Saeedi and Nathan's Pool.
@@ -2200,6 +2218,229 @@
       renderAssetSection();
     }
 
+
+    function getGoogleScriptUrl() {
+      return (qs('googleScriptUrl') && qs('googleScriptUrl').value ? qs('googleScriptUrl').value : localStorage.getItem(GOOGLE_SCRIPT_URL_STORAGE_KEY) || '').trim();
+    }
+
+    function saveGoogleScriptUrlSetting() {
+      const url = getGoogleScriptUrl();
+      if (url) {
+        localStorage.setItem(GOOGLE_SCRIPT_URL_STORAGE_KEY, url);
+        setSheetStatus('Master sheet URL saved. PDF save will also send the visit log.', 'success');
+      } else {
+        localStorage.removeItem(GOOGLE_SCRIPT_URL_STORAGE_KEY);
+        setSheetStatus('No master sheet URL saved yet.', 'info');
+      }
+    }
+
+    function setSheetStatus(message, tone = 'info') {
+      const box = qs('sheetStatusBox');
+      if (!box) return;
+      box.textContent = message;
+      box.style.color = tone === 'error' ? '#b91c1c' : tone === 'success' ? '#166534' : '#29557f';
+      localStorage.setItem(SHEET_STATUS_STORAGE_KEY, JSON.stringify({ message, tone, ts: Date.now() }));
+    }
+
+    function restoreSheetStatus() {
+      const url = localStorage.getItem(GOOGLE_SCRIPT_URL_STORAGE_KEY) || '';
+      if (qs('googleScriptUrl')) qs('googleScriptUrl').value = url;
+      try {
+        const stored = JSON.parse(localStorage.getItem(SHEET_STATUS_STORAGE_KEY) || 'null');
+        if (stored && stored.message) {
+          setSheetStatus(stored.message, stored.tone || 'info');
+          return;
+        }
+      } catch (error) {}
+      setSheetStatus(url ? 'Master sheet URL saved. PDF save will also send the visit log.' : 'No master sheet URL saved yet.', url ? 'success' : 'info');
+    }
+
+    function openScriptTest() {
+      const url = getGoogleScriptUrl();
+      if (!url) {
+        alert('Add and save your Apps Script /exec URL first.');
+        return;
+      }
+      window.open(url, '_blank', 'noopener');
+    }
+
+    function submitPayloadViaHiddenForm(url, payloadString) {
+      return new Promise((resolve, reject) => {
+        try {
+          const iframe = document.createElement('iframe');
+          const frameName = `sheetSink_${Date.now()}`;
+          iframe.name = frameName;
+          iframe.style.display = 'none';
+          const form = document.createElement('form');
+          form.method = 'POST';
+          form.action = url;
+          form.target = frameName;
+          form.style.display = 'none';
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'payload';
+          input.value = payloadString;
+          form.appendChild(input);
+          document.body.appendChild(iframe);
+          document.body.appendChild(form);
+          form.submit();
+          setTimeout(() => {
+            form.remove();
+            iframe.remove();
+            resolve(true);
+          }, 900);
+        } catch (error) {
+          reject(error);
+        }
+      });
+    }
+
+    async function updateLiveMasterSheet(payload) {
+      const url = getGoogleScriptUrl();
+      if (!url) {
+        setSheetStatus('Master sheet URL is blank. PDF still saved, but nothing was sent to the live sheet.', 'info');
+        return { attempted: false, success: false };
+      }
+      const body = JSON.stringify(payload);
+      try {
+        await fetch(url, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body
+        });
+        setSheetStatus('Update sent to the live master sheet.', 'success');
+        return { attempted: true, success: true };
+      } catch (error) {
+        try {
+          await submitPayloadViaHiddenForm(url, body);
+          setSheetStatus('Update sent to the live master sheet.', 'success');
+          return { attempted: true, success: true };
+        } catch (fallbackError) {
+          console.error('Google Sheet update failed', fallbackError);
+          setSheetStatus(`Sheet update failed: ${fallbackError.message || fallbackError}`, 'error');
+          return { attempted: true, success: false };
+        }
+      }
+    }
+
+    function buildPoolSheetPayload() {
+      const pool = getSelectedPool();
+      if (isRaidersGroupMode()) {
+        const baths = [1, 2, 3].map(index => getIceBathRecommendations(index));
+        const notes = [
+          (inputs.serviceNotes.value || '').trim(),
+          baths.map(bath => `${bath.poolName}: clarity ${bath.clarity || '-'}, pH ${bath.ph == null ? '-' : formatNumber(bath.ph, 2)}, FC ${bath.fc == null ? '-' : formatNumber(bath.fc, 2)}, Alk ${bath.alk == null ? '-' : formatNumber(bath.alk, 0)}, Acid ${formatDose(bath.acid, 'mL', 0)}, Chlorine ${formatDose(bath.chlorine, 'mL', 0)}, Bicarb ${formatDose(bath.bicarb, 'kg', 2)}${bath.note ? `, Note: ${bath.note}` : ''}.`).join(' '),
+          getContextTags().length ? `Service context: ${getContextTags().join('; ')}.` : ''
+        ].filter(Boolean).join(' ');
+        return {
+          technician: inputs.reportTechnician.value || '',
+          serviceType: 'Routine ice bath maintenance',
+          site: inputs.reportSite.value || pool.site || '',
+          assetName: 'Raiders Ice Baths - All 3',
+          volumeLitres: 18000,
+          system: 'Grouped ice bath report',
+          testTime: `${inputs.reportDate.value || ''} ${inputs.testTime.value || ''}`.trim(),
+          ph: '',
+          freeChlorine: '',
+          totalChlorine: '',
+          alkalinity: '',
+          calciumHardness: '',
+          cya: '',
+          salt: '',
+          tds: '',
+          hhwPh: '',
+          hhwTds: '',
+          hhwInhibitor: '',
+          chwPh: '',
+          chwTds: '',
+          chwInhibitor: '',
+          acidAddedMl: round(baths.reduce((sum, bath) => sum + (bath.acid || 0), 0), 0),
+          chlorineAddedG: round(baths.reduce((sum, bath) => sum + (bath.chlorine || 0), 0), 0),
+          bicarbAddedKg: round(baths.reduce((sum, bath) => sum + (bath.bicarb || 0), 0), 2),
+          calciumAddedKg: '',
+          saltAddedKg: '',
+          otherChemicals: 'Grouped ice bath report',
+          notes
+        };
+      }
+
+      const model = buildReportModel();
+      const { doses, volume } = buildRecommendationRows();
+      const dosedChemicals = model.chemicalRows
+        .filter(row => row.dosed === 'Yes' && Number.isFinite(row.value) && row.value > 0)
+        .map(row => `${row.name}: ${row.qty} ${row.unit}${row.notes ? ` (${row.notes})` : ''}`);
+      const siteMemory = getSiteMemoryState()[pool.key] || '';
+      const notesParts = [
+        (inputs.serviceNotes.value || '').trim(),
+        getContextTags().length ? `Service context: ${getContextTags().join('; ')}.` : '',
+        siteMemory ? `Site memory: ${siteMemory}` : ''
+      ].filter(Boolean);
+      return {
+        technician: inputs.reportTechnician.value || '',
+        serviceType: getServiceTypeLabel(inputs.reportPoolName.value || pool.poolName || ''),
+        site: inputs.reportSite.value || pool.site || '',
+        assetName: inputs.reportPoolName.value || pool.poolName || '',
+        volumeLitres: volume || '',
+        system: pool.systemNote || '',
+        testTime: `${inputs.reportDate.value || ''} ${inputs.testTime.value || ''}`.trim(),
+        ph: n(inputs.ph.value) ?? '',
+        freeChlorine: n(inputs.freeChlorine.value) ?? '',
+        totalChlorine: '',
+        alkalinity: n(inputs.alkalinity.value) ?? '',
+        calciumHardness: n(inputs.calciumHardness.value) ?? '',
+        cya: n(inputs.cyanuricAcid.value) ?? '',
+        salt: n(inputs.salt.value) ?? '',
+        tds: '',
+        hhwPh: '',
+        hhwTds: '',
+        hhwInhibitor: '',
+        chwPh: '',
+        chwTds: '',
+        chwInhibitor: '',
+        acidAddedMl: doses.acid || '',
+        chlorineAddedG: doses.chlorine || '',
+        bicarbAddedKg: doses.bicarb || '',
+        calciumAddedKg: doses.calcium || '',
+        saltAddedKg: doses.salt || '',
+        otherChemicals: dosedChemicals.join(' | '),
+        notes: notesParts.join(' ')
+      };
+    }
+
+    function buildClosedLoopSheetPayload() {
+      return {
+        technician: inputs.closedTechnician.value || '',
+        serviceType: 'Closed loop service',
+        site: inputs.closedSite.value || '',
+        assetName: inputs.closedSystemName.value || '',
+        volumeLitres: '',
+        system: 'Closed loop',
+        testTime: `${inputs.closedDate.value || ''} ${inputs.closedTime.value || ''}`.trim(),
+        ph: '',
+        freeChlorine: '',
+        totalChlorine: '',
+        alkalinity: '',
+        calciumHardness: '',
+        cya: '',
+        salt: '',
+        tds: '',
+        hhwPh: n(inputs.hhwPh.value) ?? '',
+        hhwTds: n(inputs.hhwTds.value) ?? '',
+        hhwInhibitor: n(inputs.hhwInhibitor.value) ?? '',
+        chwPh: n(inputs.chwPh.value) ?? '',
+        chwTds: n(inputs.chwTds.value) ?? '',
+        chwInhibitor: n(inputs.chwInhibitor.value) ?? '',
+        acidAddedMl: '',
+        chlorineAddedG: '',
+        bicarbAddedKg: '',
+        calciumAddedKg: '',
+        saltAddedKg: '',
+        otherChemicals: '',
+        notes: (inputs.closedNotes.value || '').trim()
+      };
+    }
+
     function closedLoopStatus(current, min, max) {
       if (current == null || min == null || max == null) return { label: 'Missing', className: 'status-pill', action: 'Enter the current reading and the normal range.' };
       if (current < min) return { label: 'Low', className: 'status-pill status-warn' };
@@ -2409,6 +2650,7 @@
 
       const filenameBase = (model.systemName || 'closed-loop-report').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       const filename = `${filenameBase || 'closed-loop-report'}-${inputs.closedDate.value || 'report'}.pdf`;
+      await updateLiveMasterSheet(buildClosedLoopSheetPayload());
       const blob = doc.output('blob');
       await saveBlob(blob, filename, 'application/pdf');
     }
@@ -3772,6 +4014,7 @@ async function savePdfReport() {
 
       const filenameBase = (inputs.reportPoolName.value || 'water-quality-report').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       const filename = `${filenameBase || 'water-quality-report'}-${inputs.reportDate.value || 'report'}.pdf`;
+      await updateLiveMasterSheet(buildPoolSheetPayload());
       const blob = doc.output('blob');
       await saveBlob(blob, filename, 'application/pdf');
     }
@@ -4345,7 +4588,8 @@ async function savePdfReport() {
         'chwTds', 'chwTdsMin', 'chwTdsMax', 'chwPh', 'chwPhMin', 'chwPhMax', 'chwInhibitor', 'chwInhibitorMin', 'chwInhibitorMax',
         'iceBath1Clarity', 'iceBath1Ph', 'iceBath1Fc', 'iceBath1Alk', 'iceBath1Temp', 'iceBath1Note',
         'iceBath2Clarity', 'iceBath2Ph', 'iceBath2Fc', 'iceBath2Alk', 'iceBath2Temp', 'iceBath2Note',
-        'iceBath3Clarity', 'iceBath3Ph', 'iceBath3Fc', 'iceBath3Alk', 'iceBath3Temp', 'iceBath3Note'
+        'iceBath3Clarity', 'iceBath3Ph', 'iceBath3Fc', 'iceBath3Alk', 'iceBath3Temp', 'iceBath3Note',
+        'googleScriptUrl'
       ].forEach(id => {
         inputs[id] = qs(id);
       });
@@ -4360,6 +4604,7 @@ async function savePdfReport() {
       renderCombinedTable();
       renderStockSection();
       renderQrSection();
+      restoreSheetStatus();
 
       Object.values(inputs).forEach(input => {
         if (!input) return;
@@ -4390,6 +4635,8 @@ async function savePdfReport() {
       qs('saveSiteMemoryBtn').addEventListener('click', saveCurrentSiteMemory);
       qs('saveInsightSnapshotBtn').addEventListener('click', savePoolVisitSnapshot);
       qs('saveAssetBtn').addEventListener('click', saveAsset);
+      qs('saveGoogleScriptUrlBtn').addEventListener('click', saveGoogleScriptUrlSetting);
+      qs('openScriptTestBtn').addEventListener('click', openScriptTest);
       qs('exportDataBtn').addEventListener('click', () => {
         const payload = {
           state: loadJson(STORAGE_KEY, {}),
