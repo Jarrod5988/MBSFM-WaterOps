@@ -1122,7 +1122,7 @@
         </div>
 
         <div class="grid" style="gap: 12px;">
-          <div class="span-6" style="grid-column: span 12;">
+          <div class="span-6" id="singlePhotoCaptureBlock" style="grid-column: span 12;">
             <div class="button-row" style="margin-bottom: 10px; flex-wrap: wrap;">
               <label class="button secondary" for="photoInput" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">
                 Add Spin Touch photo
@@ -1885,10 +1885,12 @@
       const singleCombinedCard = qs('singleCombinedCard');
       const groupIceBathsCard = qs('groupIceBathsCard');
       const stockLogCard = qs('stockLogCard');
+      const singlePhotoCaptureBlock = qs('singlePhotoCaptureBlock');
       if (singleResultsCard) singleResultsCard.classList.toggle('hidden', groupMode);
       if (singleCombinedCard) singleCombinedCard.classList.toggle('hidden', groupMode);
       if (groupIceBathsCard) groupIceBathsCard.classList.toggle('hidden', !groupMode);
       if (stockLogCard) stockLogCard.classList.toggle('hidden', groupMode);
+      if (singlePhotoCaptureBlock) singlePhotoCaptureBlock.classList.toggle('hidden', groupMode);
     }
 
     function getIceBathPool(index) {
